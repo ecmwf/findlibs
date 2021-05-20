@@ -31,7 +31,7 @@ def find(name):
         LIB_HOME = "{}_{}".format(name.upper(), what)
         if LIB_HOME in os.environ:
             home = os.environ[LIB_HOME]
-            fullname = os.path.join(home, "lib", f"lib{name}{extension}")
+            fullname = os.path.join(home, "lib", "lib{}{}".format(name, extension))
             if os.path.exists(fullname):
                 return fullname
 
@@ -40,13 +40,13 @@ def find(name):
         "DYLD_LIBRARY_PATH",
     ):
         for home in os.environ.get(path, "").split(":"):
-            fullname = os.path.join(home, f"lib{name}{extension}")
+            fullname = os.path.join(home, "lib{}{}".format(name, extension))
             if os.path.exists(fullname):
                 return fullname
 
     for root in ("/", "/usr/", "/usr/local/", "/opt/"):
         for lib in ("lib", "lib64"):
-            fullname = os.path.join(home, f"{root}{lib}/lib{name}{extension}")
+            fullname = os.path.join(home, "{}{}/lib{}{}".format(root, lib, name, extension))
             if os.path.exists(fullname):
                 return fullname
 
