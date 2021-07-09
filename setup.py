@@ -32,7 +32,8 @@ assert version
 setuptools.setup(
     name="findlibs",
     version=version,
-    description="A packages to search for shared libraries on various platforms",
+    description="A package to search for shared libraries on various "
+                "platforms",
     long_description=read("README.md"),
     author="European Centre for Medium-Range Weather Forecasts (ECMWF)",
     author_email="software.support@ecmwf.int",
@@ -41,6 +42,10 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[],
+    tests_require=[
+        "pytest",
+        "pytest-mock",
+    ],
     zip_safe=True,
     keywords="tool",
     classifiers=[
@@ -51,6 +56,7 @@ setuptools.setup(
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
         "Operating System :: OS Independent",
