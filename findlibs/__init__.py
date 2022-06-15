@@ -12,9 +12,7 @@ import ctypes.util
 import os
 import sys
 
-__version__ = "0.0.2"
-
-
+__version__ = "0.0.3"
 
 EXTENSIONS = {
     "darwin": ".dylib",
@@ -27,10 +25,18 @@ def find(name):
 
     extension = EXTENSIONS.get(sys.platform, ".so")
 
+    # sys.prefix/lib, $CONDA_PREFIX/lib has highest priority;
+    # otherwise, system library may mess up anaconda's virtual environment.
+    for root in (sys.prefix, os.environ.get("CONDA_PREFIX", "")):
+        for lib in ("lib", "lib64"):
+            fullname = os.path.join(root, lib, "lib{}{}".format(name, extension))
+            if os.path.exists(fullname):
+                return fullname
+
     for what in ("HOME", "DIR"):
-        LIB_HOME = "{}_{}".format(name.upper(), what)
-        if LIB_HOME in os.environ:
-            home = os.environ[LIB_HOME]
+        lib_home = "{}_{}".format(name.upper(), what)
+        if lib_home in os.environ:
+            home = os.environ[lib_home]
             fullname = os.path.join(home, "lib", "lib{}{}".format(name, extension))
             if os.path.exists(fullname):
                 return fullname
@@ -46,7 +52,7 @@ def find(name):
 
     for root in ("/", "/usr/", "/usr/local/", "/opt/"):
         for lib in ("lib", "lib64"):
-            fullname = os.path.join(home, "{}{}/lib{}{}".format(root, lib, name, extension))
+            fullname = os.path.join(root, lib, "lib{}{}".format(name, extension))
             if os.path.exists(fullname):
                 return fullname
 
