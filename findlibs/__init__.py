@@ -30,10 +30,11 @@ def find(name):
     for what in ("HOME", "DIR"):
         LIB_HOME = "{}_{}".format(name.upper(), what)
         if LIB_HOME in os.environ:
-            home = os.environ[LIB_HOME]
-            fullname = os.path.join(home, "lib", "lib{}{}".format(name, extension))
-            if os.path.exists(fullname):
-                return fullname
+            home = os.path.expanduser(os.environ[LIB_HOME])
+            for lib in ("lib", "lib64"):
+                fullname = os.path.join(home, lib, "lib{}{}".format(name, extension))
+                if os.path.exists(fullname):
+                    return fullname
 
     for path in (
         "LD_LIBRARY_PATH",
