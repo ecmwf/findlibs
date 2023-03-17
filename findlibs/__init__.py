@@ -27,12 +27,18 @@ def find(name):
 
     # sys.prefix/lib, $CONDA_PREFIX/lib has highest priority;
     # otherwise, system library may mess up anaconda's virtual environment.
-    for root in (sys.prefix, os.environ.get("CONDA_PREFIX", "")):
+    
+    roots = [sys.prefix]
+    if "CONDA_PREFIX" in os.environ:
+        roots.append(os.environ["CONDA_PREFIX"])
+        
+    for root in roots:
         for lib in ("lib", "lib64"):
             fullname = os.path.join(root, lib, "lib{}{}".format(name, extension))
             if os.path.exists(fullname):
                 return fullname
 
+            
     for what in ("HOME", "DIR"):
         LIB_HOME = "{}_{}".format(name.upper(), what)
         if LIB_HOME in os.environ:
