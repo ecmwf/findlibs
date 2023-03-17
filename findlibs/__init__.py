@@ -34,12 +34,13 @@ def find(name):
                 return fullname
 
     for what in ("HOME", "DIR"):
-        lib_home = "{}_{}".format(name.upper(), what)
-        if lib_home in os.environ:
-            home = os.environ[lib_home]
-            fullname = os.path.join(home, "lib", "lib{}{}".format(name, extension))
-            if os.path.exists(fullname):
-                return fullname
+        LIB_HOME = "{}_{}".format(name.upper(), what)
+        if LIB_HOME in os.environ:
+            home = os.path.expanduser(os.environ[LIB_HOME])
+            for lib in ("lib", "lib64"):
+                fullname = os.path.join(home, lib, "lib{}{}".format(name, extension))
+                if os.path.exists(fullname):
+                    return fullname
 
     for path in (
         "LD_LIBRARY_PATH",
@@ -50,7 +51,7 @@ def find(name):
             if os.path.exists(fullname):
                 return fullname
 
-    for root in ("/", "/usr/", "/usr/local/", "/opt/"):
+    for root in ("/", "/usr/", "/usr/local/", "/opt/", "/opt/homebrew/"):
         for lib in ("lib", "lib64"):
             fullname = os.path.join(root, lib, "lib{}{}".format(name, extension))
             if os.path.exists(fullname):
