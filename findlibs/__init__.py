@@ -20,9 +20,19 @@ EXTENSIONS = {
 }
 
 
-def find(name):
-    """Returns the path to the selected library, or None if not found."""
+def find(lib_name, pkg_name=None):
+    """Returns the path to the selected library, or None if not found.
 
+    Args:
+        lib_name (str): Library name without the `lib` prefix
+        pkg_name (str, optional): Package name if it differs from the library name.
+            Defaults to None.
+
+    Returns:
+        str | None: Path to selected library
+    """
+
+    pkg_name = pkg_name or lib_name
     extension = EXTENSIONS.get(sys.platform, ".so")
 
     # sys.prefix/lib, $CONDA_PREFIX/lib has highest priority;
@@ -34,16 +44,21 @@ def find(name):
 
     for root in roots:
         for lib in ("lib", "lib64"):
-            fullname = os.path.join(root, lib, "lib{}{}".format(name, extension))
+            fullname = os.path.join(root, lib, "lib{}{}".format(lib_name, extension))
             if os.path.exists(fullname):
                 return fullname
 
-    for what in ("HOME", "DIR"):
-        LIB_HOME = "{}_{}".format(name.upper(), what)
-        if LIB_HOME in os.environ:
-            home = os.path.expanduser(os.environ[LIB_HOME])
+    env_prefixes = [pkg_name.upper(), pkg_name.lower()]
+    env_suffixes = ["HOME", "DIR"]
+    envs = ["{}_{}".format(x, y) for x in env_prefixes for y in env_suffixes]
+
+    for env in envs:
+        if env in os.environ:
+            home = os.path.expanduser(os.environ[env])
             for lib in ("lib", "lib64"):
-                fullname = os.path.join(home, lib, "lib{}{}".format(name, extension))
+                fullname = os.path.join(
+                    home, lib, "lib{}{}".format(lib_name, extension)
+                )
                 if os.path.exists(fullname):
                     return fullname
 
@@ -52,14 +67,14 @@ def find(name):
         "DYLD_LIBRARY_PATH",
     ):
         for home in os.environ.get(path, "").split(":"):
-            fullname = os.path.join(home, "lib{}{}".format(name, extension))
+            fullname = os.path.join(home, "lib{}{}".format(lib_name, extension))
             if os.path.exists(fullname):
                 return fullname
 
     for root in ("/", "/usr/", "/usr/local/", "/opt/", "/opt/homebrew/"):
         for lib in ("lib", "lib64"):
-            fullname = os.path.join(root, lib, "lib{}{}".format(name, extension))
+            fullname = os.path.join(root, lib, "lib{}{}".format(lib_name, extension))
             if os.path.exists(fullname):
                 return fullname
 
-    return ctypes.util.find_library(name)
+    return ctypes.util.find_library(lib_name)
