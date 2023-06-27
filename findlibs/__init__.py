@@ -8,22 +8,6 @@
 # nor does it submit to any jurisdiction.
 #
 
-"""
-Use python config parser
-
-file locations: 
-~/.findlibs, ~/.config/findlibs/findlibs.conf
-if both, throw error
-
-config file: 
-[Paths]
-/path/to/foo
-/path/to/bar
-/path/to/baz
-
-if relative paths or files, throw error
-"""
-
 import ctypes.util
 import os
 import sys
