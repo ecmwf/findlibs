@@ -41,7 +41,10 @@ setuptools.setup(
     url="https://github.com/ecmwf/findlibs",
     packages=setuptools.find_packages(),
     include_package_data=True,
-    install_requires=[],
+    install_requires=["PyYAML"],
+    extras_require={
+        'test': ["pytest", "pyfakefs"]
+    },
     zip_safe=True,
     keywords="tool",
     classifiers=[
