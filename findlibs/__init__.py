@@ -11,6 +11,8 @@
 import ctypes.util
 import os
 import sys
+import yaml
+from pathlib import Path
 
 __version__ = "0.0.5"
 
@@ -61,6 +63,24 @@ def find(lib_name, pkg_name=None):
                 )
                 if os.path.exists(fullname):
                     return fullname
+
+    config_file = Path("~/.findlibs.yml").expanduser()
+
+    if config_file.exists():
+        with open(config_file, "r") as f:
+            config = yaml.safe_load(f.read()) or dict()
+            
+        search_paths = config.get("additional_search_paths", []) or []
+            
+        # replace $HOME with ~, expand ~ to full path, 
+        # resolve any relative paths to absolute paths
+        config_paths = {Path(p.replace("$HOME", "~")).expanduser().resolve() 
+                for p in search_paths}
+
+        for root in config_paths:
+            for lib in ("lib", "lib64"):        
+                filepath = root / lib / f"lib{lib_name}{extension}"
+                if filepath.exists(): return str(filepath)
 
     for path in (
         "LD_LIBRARY_PATH",
