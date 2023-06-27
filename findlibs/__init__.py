@@ -8,10 +8,26 @@
 # nor does it submit to any jurisdiction.
 #
 
+"""
+Use python config parser
+
+file locations: 
+~/.findlibs, ~/.config/findlibs/findlibs.conf
+if both, throw error
+
+config file: 
+[Paths]
+/path/to/foo
+/path/to/bar
+/path/to/baz
+
+if relative paths or files, throw error
+"""
+
 import ctypes.util
 import os
 import sys
-import yaml
+import configparser
 from pathlib import Path
 
 __version__ = "0.0.5"
@@ -20,6 +36,44 @@ EXTENSIONS = {
     "darwin": ".dylib",
     "win32": ".dll",
 }
+
+def _get_paths_from_config():
+    locations = [Path(p).expanduser() for p in [
+        "~/.config/findlibs/findlibs.conf",
+        "~/.findlibs",
+    ]]
+
+    locations = [p for p in locations if p.exists()]
+
+    if len(locations) == 0: return []
+    if len(locations) > 1:     
+        raise ValueError(f"There are multiple config files! Delete all but one of {locations}")
+
+    config = configparser.RawConfigParser(allow_no_value = True) # Allow keys without values
+    config.optionxform = lambda option: option # Preserve case of keys 
+    
+    with open(locations[0], "r") as f:
+        config.read(locations[0])
+    
+    if "Paths" not in config: return []
+    print(config)
+    # replace $HOME with ~, expand ~ to full path, 
+    # resolve any relative paths to absolute paths
+    paths = {Path(p.replace("$HOME", "~")).expanduser()
+            for p in config["Paths"] or []}
+    
+    relative_paths = [p for p in paths if not p.is_absolute()]
+    if relative_paths:
+        raise ValueError(f"Don't use relative paths in the config file ({locations[0]}), offending paths are: {relative_paths}")
+    
+    files = [p for p in paths if not p.is_dir()]
+    if files:
+        raise ValueError(f"Don't put files in the config file ({locations[0]}), offending files are: {files}")
+    
+
+    return paths
+
+
 
 
 def find(lib_name, pkg_name=None):
@@ -36,6 +90,7 @@ def find(lib_name, pkg_name=None):
 
     pkg_name = pkg_name or lib_name
     extension = EXTENSIONS.get(sys.platform, ".so")
+    libname = "lib{}{}".format(lib_name, extension)
 
     # sys.prefix/lib, $CONDA_PREFIX/lib has highest priority;
     # otherwise, system library may mess up anaconda's virtual environment.
@@ -46,7 +101,8 @@ def find(lib_name, pkg_name=None):
 
     for root in roots:
         for lib in ("lib", "lib64"):
-            fullname = os.path.join(root, lib, "lib{}{}".format(lib_name, extension))
+            fullname = os.path.join(root, lib, libname)
+            print(f"looking at {fullname}")
             if os.path.exists(fullname):
                 return fullname
 
@@ -59,41 +115,30 @@ def find(lib_name, pkg_name=None):
             home = os.path.expanduser(os.environ[env])
             for lib in ("lib", "lib64"):
                 fullname = os.path.join(
-                    home, lib, "lib{}{}".format(lib_name, extension)
+                    home, lib, libname
                 )
                 if os.path.exists(fullname):
                     return fullname
 
-    config_file = Path("~/.findlibs.yml").expanduser()
+    config_paths = _get_paths_from_config()
 
-    if config_file.exists():
-        with open(config_file, "r") as f:
-            config = yaml.safe_load(f.read()) or dict()
-            
-        search_paths = config.get("additional_search_paths", []) or []
-            
-        # replace $HOME with ~, expand ~ to full path, 
-        # resolve any relative paths to absolute paths
-        config_paths = {Path(p.replace("$HOME", "~")).expanduser().resolve() 
-                for p in search_paths}
-
-        for root in config_paths:
-            for lib in ("lib", "lib64"):        
-                filepath = root / lib / f"lib{lib_name}{extension}"
-                if filepath.exists(): return str(filepath)
+    for root in config_paths:
+        for lib in ("lib", "lib64"):        
+            filepath = root / lib / f"lib{lib_name}{extension}"
+            if filepath.exists(): return str(filepath)
 
     for path in (
         "LD_LIBRARY_PATH",
         "DYLD_LIBRARY_PATH",
     ):
         for home in os.environ.get(path, "").split(":"):
-            fullname = os.path.join(home, "lib{}{}".format(lib_name, extension))
+            fullname = os.path.join(home, libname)
             if os.path.exists(fullname):
                 return fullname
 
     for root in ("/", "/usr/", "/usr/local/", "/opt/", "/opt/homebrew/", os.path.expanduser("~/.local")):
         for lib in ("lib", "lib64"):
-            fullname = os.path.join(root, lib, "lib{}{}".format(lib_name, extension))
+            fullname = os.path.join(root, lib, libname)
             if os.path.exists(fullname):
                 return fullname
 

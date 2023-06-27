@@ -6,12 +6,43 @@ from pathlib import Path
 
 extension = findlibs.EXTENSIONS.get(sys.platform, ".so")
 testlib_path = Path(f"/usr/lib/test{extension}")
-config_path = Path(f"~/.findlibs.yml").expanduser().resolve()
+config_path = Path(f"~/.config/findlibs/findlibs.conf").expanduser().resolve()
+
+config_paths = [Path(f"~/.config/findlibs/findlibs.conf").expanduser().resolve(),
+                Path(f"~/.findlibs").expanduser().resolve()]
 
 def test_no_config_file(fs):
     "Check that findlibs works with no config file"
     fs.create_file(testlib_path)
     assert findlibs.find("test") == str(testlib_path)
+
+def test_both_config_files(fs):
+    "Check that it throws an error if two config files are present"
+    for p in config_paths: fs.create_file(p)
+    with pytest.raises(ValueError):
+        findlibs._get_paths_from_config()
+
+def test_relative_path(fs):
+    "Check that it throws an error on relative paths"
+    fs.create_file(config_path, contents = 
+"""
+[Paths]
+relative/path
+""")
+
+    with pytest.raises(ValueError):
+        findlibs._get_paths_from_config()
+
+def test_file(fs):
+    "Check that it throws an error when files are included"
+    fs.create_file(config_path, contents = 
+"""
+[Paths]
+/path/to/file.so
+""")
+
+    with pytest.raises(ValueError):
+        findlibs._get_paths_from_config()
 
 def test_empty_config_file(fs):
     "Check that it works with an empty config file"
@@ -25,7 +56,7 @@ def test_empty_search_paths(fs):
     fs.create_file(testlib_path)
     fs.create_file(config_path, contents = 
 """
-additional_search_paths:
+[Paths]
 """)
 
     assert config_path.exists()
@@ -45,8 +76,8 @@ def test_config(fs, search_dir, testlib_path):
     fs.create_file(testlib_path)
     fs.create_file(config_path, contents = 
 f"""
-additional_search_paths:
-  - {search_dir}
+[Paths]
+{search_dir}
 """)
     assert findlibs.find("test") == str(testlib_path)
     
