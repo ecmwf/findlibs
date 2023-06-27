@@ -71,7 +71,7 @@ def find(lib_name, pkg_name=None):
             if os.path.exists(fullname):
                 return fullname
 
-    for root in ("/", "/usr/", "/usr/local/", "/opt/", "/opt/homebrew/", os.path.expanduser("~/local")):
+    for root in ("/", "/usr/", "/usr/local/", "/opt/", "/opt/homebrew/", os.path.expanduser("~/.local")):
         for lib in ("lib", "lib64"):
             fullname = os.path.join(root, lib, "lib{}{}".format(lib_name, extension))
             if os.path.exists(fullname):
