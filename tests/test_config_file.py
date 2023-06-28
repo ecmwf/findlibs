@@ -5,16 +5,14 @@ import findlibs
 from pathlib import Path
 
 extension = findlibs.EXTENSIONS.get(sys.platform, ".so")
-testlib_path = Path(f"/usr/lib/test{extension}")
-config_path = Path(f"~/.config/findlibs/findlibs.conf").expanduser().resolve()
-
-config_paths = [Path(f"~/.config/findlibs/findlibs.conf").expanduser().resolve(),
-                Path(f"~/.findlibs").expanduser().resolve()]
+testlib_path = f"/usr/lib/test{extension}"
+config_paths = [str(Path(p).expanduser()) for p in [f"~/.config/findlibs/findlibs.conf",
+                f"~/.findlibs"]]
 
 def test_no_config_file(fs):
     "Check that findlibs works with no config file"
     fs.create_file(testlib_path)
-    assert findlibs.find("test") == str(testlib_path)
+    assert findlibs.find("test") == testlib_path
 
 def test_both_config_files(fs):
     "Check that it throws an error if two config files are present"
@@ -24,7 +22,7 @@ def test_both_config_files(fs):
 
 def test_relative_path(fs):
     "Check that it throws an error on relative paths"
-    fs.create_file(config_path, contents = 
+    fs.create_file(config_paths[0], contents = 
 """
 [Paths]
 relative/path
@@ -35,7 +33,7 @@ relative/path
 
 def test_file(fs):
     "Check that it throws an error when files are included"
-    fs.create_file(config_path, contents = 
+    fs.create_file(config_paths[0], contents = 
 """
 [Paths]
 /path/to/file.so
@@ -47,20 +45,17 @@ def test_file(fs):
 def test_empty_config_file(fs):
     "Check that it works with an empty config file"
     fs.create_file(testlib_path)
-    fs.create_file(config_path)
-    assert config_path.exists()
-    assert findlibs.find("test") == str(testlib_path)
+    fs.create_file(config_paths[0])
+    assert findlibs.find("test") == testlib_path
 
 def test_empty_search_paths(fs):
     "Check that it works with an empty config file"
     fs.create_file(testlib_path)
-    fs.create_file(config_path, contents = 
+    fs.create_file(config_paths[0], contents = 
 """
 [Paths]
 """)
-
-    assert config_path.exists()
-    assert findlibs.find("test") == str(testlib_path)
+    assert findlibs.find("test") == testlib_path
 
 # Parametrised tests over
 # search_dir: a path you could put into .findlibs.yml
@@ -74,7 +69,7 @@ def test_empty_search_paths(fs):
 def test_config(fs, search_dir, testlib_path):
 
     fs.create_file(testlib_path)
-    fs.create_file(config_path, contents = 
+    fs.create_file(config_paths[0], contents = 
 f"""
 [Paths]
 {search_dir}
