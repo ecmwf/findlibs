@@ -40,7 +40,6 @@ def _get_paths_from_config():
         config.read(locations[0])
     
     if "Paths" not in config: return []
-    print(config)
     # replace $HOME with ~, expand ~ to full path, 
     # resolve any relative paths to absolute paths
     paths = {Path(p.replace("$HOME", "~")).expanduser()
@@ -86,7 +85,6 @@ def find(lib_name, pkg_name=None):
     for root in roots:
         for lib in ("lib", "lib64"):
             fullname = os.path.join(root, lib, libname)
-            print(f"looking at {fullname}")
             if os.path.exists(fullname):
                 return fullname
 
