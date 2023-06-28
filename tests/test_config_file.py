@@ -5,7 +5,7 @@ import findlibs
 from pathlib import Path
 
 extension = findlibs.EXTENSIONS.get(sys.platform, ".so")
-testlib_path = f"/usr/lib/test{extension}"
+testlib_path = f"/usr/lib/libtest{extension}"
 config_paths = [str(Path(p).expanduser()) for p in [f"~/.config/findlibs/findlibs.conf",
                 f"~/.findlibs"]]
 
