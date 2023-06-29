@@ -57,20 +57,25 @@ def _get_paths_from_config():
     return paths
 
 
-
-
 def find(lib_name, pkg_name=None):
     """Returns the path to the selected library, or None if not found.
 
-    Args:
-        lib_name (str): Library name without the `lib` prefix
-        pkg_name (str, optional): Package name if it differs from the library name.
-            Defaults to None.
+    Arguments
+    ---------
+    lib_name : str
+        Library name without the `lib` prefix. The name of the library to
+        find is formed using ``lib_name`` and a platform specific suffix
+        (by default ".so"). E.g. when ``lib_name`` is "eccodes" the library
+        name will be "libeccodes.so" on Linux and "libeccodes.dylib"
+        on macOS.
+    pkg_name :  str, optional
+        Package name if it differs from the library name. Defaults to None.
 
-    Returns:
-        str | None: Path to selected library
+    Returns
+    --------
+    str or None
+        Path to selected library
     """
-
     pkg_name = pkg_name or lib_name
     extension = EXTENSIONS.get(sys.platform, ".so")
     libname = "lib{}{}".format(lib_name, extension)
