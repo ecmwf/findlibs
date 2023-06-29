@@ -54,7 +54,7 @@ The **algorithm** to find the library is as follows:
 
 - Next, tries to load the search paths from the user defined `~/.findlibs` or `~/.config/findlibs/findlibs.conf` INI configuration files. Then for all the user defined search paths the `lib` and `lib64` directories are tried. 
 
-    Please note that only one of these files can exist. The configuration file can contain multiple search paths, but no relative paths or paths to files are allowed. The config file can even be completely empty or can contain no paths at all. The file format is as follows:
+    Please note that only one of these files can exist. The configuration file can contain multiple search paths, but no relative paths or paths to files are allowed. The file can even be completely empty or can contain no paths at all. The file format is as follows:
 
     ```
     [Paths]
