@@ -15,7 +15,9 @@ lib = findlibs.find(lib_name="odccore", pkg_name="odc")
 
 ## Installation
 
-`pip install findlibs`
+```bash
+pip install findlibs
+```
 
 ## Testing
 
