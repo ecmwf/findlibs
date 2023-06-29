@@ -26,7 +26,7 @@ pip install -e ".[test]"
 pytest
 ```
 
-## find(
+## find
 
 The module only contains the `find()` function.
 
