@@ -52,9 +52,9 @@ The **algorithm** to find the library is as follows:
 
 - Next, tries the `lib` and `lib64` directories under the paths defined by the `pkg_name + "_HOME"` and `pkg_name + "_DIR"` environment variables. Both lowercase and uppercase versions are tested. E.g. if `pkg_name` is "eccodes" it will check the paths defined by `$eccodes_dir`, `$eccodes_home`, `$ECCODES_DIR` and `$ECCODES_HOME`.
 
-- Next, tries to load the search paths from the user defined `~/.findlibs` or `~/.config/findlibs/findlibs.conf` INI configuration files. Then for all the user defined paths the `lib` and `lib64` directories are tried. 
+- Next, tries to load the search paths from the user defined `~/.findlibs` or `~/.config/findlibs/findlibs.conf` INI configuration files. Then for all the user defined search paths the `lib` and `lib64` directories are tried. 
 
-    Please note that only one of these files may exist. The configuration file can contain multiple search paths, but no relative paths or paths to files are allowed. The config file can even be completely empty or can contain no paths at all. The file format is as follows:
+    Please note that only one of these files can exist. The configuration file can contain multiple search paths, but no relative paths or paths to files are allowed. The config file can even be completely empty or can contain no paths at all. The file format is as follows:
 
     ```
     [Paths]
