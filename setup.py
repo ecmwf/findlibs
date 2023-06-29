@@ -42,6 +42,9 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[],
+    extras_require={
+        'test': ["pytest", "pyfakefs"]
+    },
     zip_safe=True,
     keywords="tool",
     classifiers=[
