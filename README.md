@@ -26,9 +26,9 @@ pip install -e ".[test]"
 pytest
 ```
 
-## find()
+## find(
 
-The module only contains function `find()`.
+The module only contains the `find()` function.
 
 ```python
 def find(lib_name, pkg_name=None)
