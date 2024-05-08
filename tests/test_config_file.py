@@ -10,7 +10,7 @@
 import sys
 from pathlib import Path
 
-import pyfakefs  # registers a fixture called "fs" with pytest
+import pyfakefs  # noqa registers a fixture called "fs" with pytest
 import pytest
 
 import findlibs
@@ -19,7 +19,7 @@ extension = findlibs.EXTENSIONS.get(sys.platform, ".so")
 testlib_path = f"/usr/lib/libtest{extension}"
 config_paths = [
     str(Path(p).expanduser())
-    for p in [f"~/.config/findlibs/findlibs.conf", f"~/.findlibs"]
+    for p in ["~/.config/findlibs/findlibs.conf", "~/.findlibs"]
 ]
 
 

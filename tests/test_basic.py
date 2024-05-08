@@ -11,7 +11,7 @@ import os
 import sys
 from pathlib import Path
 
-import pyfakefs  # registers a fixture called "fs" with pytest
+import pyfakefs  # noqa registers a fixture called "fs" with pytest
 import pytest
 
 import findlibs

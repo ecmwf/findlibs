@@ -45,7 +45,7 @@ def _get_paths_from_config():
     )  # Allow keys without values
     config.optionxform = lambda option: option  # Preserve case of keys
 
-    with open(locations[0], "r") as f:
+    with open(locations[0], "r"):
         config.read(locations[0])
 
     if "Paths" not in config:
@@ -57,7 +57,10 @@ def _get_paths_from_config():
     relative_paths = [p for p in paths if not p.is_absolute()]
     if relative_paths:
         raise ValueError(
-            f"Don't use relative paths in the config file ({locations[0]}), offending paths are: {relative_paths}"
+            (
+                f"Don't use relative paths in the config file ({locations[0]}),"
+                f" offending paths are: {relative_paths}"
+            )
         )
 
     files = [p for p in paths if not p.is_dir()]
