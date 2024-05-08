@@ -7,11 +7,13 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-import pytest
-import pyfakefs # registers a fixture called "fs" with pytest
 import sys
-import findlibs
 from pathlib import Path
+
+import pyfakefs  # registers a fixture called "fs" with pytest
+import pytest
+
+import findlibs
 
 extension = findlibs.EXTENSIONS.get(sys.platform, ".so")
 testlib_path = f"/usr/lib/libtest{extension}"
