@@ -10,6 +10,7 @@
 
 import configparser
 import ctypes.util
+import importlib
 import os
 import sys
 from pathlib import Path
@@ -21,6 +22,50 @@ EXTENSIONS = {
     "win32": ".dll",
 }
 
+def _find_in_package(lib_name: str, pkg_name: str) -> str|None:
+    """Tries to find the library in an installed python module `{pgk_name}libs`.
+    This is a convention used by, for example, by newly built binary-only ecmwf
+    packages, such as eckit dlibs in the "eckitlib" python module."""
+    # NOTE we could have searched for relative location wrt __file__ -- but that
+    # breaks eg editable installs of findlibs, conda-venv combinations, etc.
+    # The price we pay is that the binary packages have to be importible, ie,
+    # the default output of auditwheel wont work
+    try:
+        module = importlib.import_module(pkg_name + "libs")
+        venv_wheel_lib = str((Path(module.__file__) / '..' / lib_name).resolve())
+        if os.path.exists(venv_wheel_lib):
+            return venv_wheel_lib
+    except ImportError:
+        pass
+    return None
+
+def _find_in_python(lib_name: str, pkg_name: str) -> str|None:
+    """Tries to find the library installed directly to Conda/Python sys.prefix
+    libs"""
+    roots = [sys.prefix]
+    if "CONDA_PREFIX" in os.environ:
+        roots.append(os.environ["CONDA_PREFIX"])
+
+    for root in roots:
+        for lib in ("lib", "lib64"):
+            fullname = os.path.join(root, lib, lib_name)
+            if os.path.exists(fullname):
+                return fullname
+    return None
+
+def _find_in_home(lib_name: str, pkg_name: str) -> str|None:
+    env_prefixes = [pkg_name.upper(), pkg_name.lower()]
+    env_suffixes = ["HOME", "DIR"]
+    envs = ["{}_{}".format(x, y) for x in env_prefixes for y in env_suffixes]
+
+    for env in envs:
+        if env in os.environ:
+            home = os.path.expanduser(os.environ[env])
+            for lib in ("lib", "lib64"):
+                fullname = os.path.join(home, lib, lib_name)
+                if os.path.exists(fullname):
+                    return fullname
+    return None
 
 def _get_paths_from_config():
     locations = [
@@ -71,8 +116,45 @@ def _get_paths_from_config():
 
     return paths
 
+def _find_in_config_paths(lib_name: str, pkg_name: str) -> str|None:
+    paths = _get_paths_from_config()
+    for root in paths:
+        for lib in ("lib", "lib64"):
+            filepath = root / lib / lib_name
+            if filepath.exists():
+                return str(filepath)
+    return None
 
-def find(lib_name, pkg_name=None):
+def _find_in_ld_path(lib_name: str, pkg_name: str) -> str|None:
+    for path in (
+        "LD_LIBRARY_PATH",
+        "DYLD_LIBRARY_PATH",
+    ):
+        for home in os.environ.get(path, "").split(":"):
+            fullname = os.path.join(home, lib_name)
+            if os.path.exists(fullname):
+                return fullname
+    return None
+
+def _find_in_sys(lib_name: str, pkg_name: str) -> str|None:
+    for root in (
+        "/",
+        "/usr/",
+        "/usr/local/",
+        "/opt/",
+        "/opt/homebrew/",
+        os.path.expanduser("~/.local"),
+    ):
+        for lib in ("lib", "lib64"):
+            fullname = os.path.join(root, lib, lib_name)
+            if os.path.exists(fullname):
+                return fullname
+    return None
+
+def _find_in_ctypes_util(lib_name: str, pkg_name: str) -> str|None:
+    return ctypes.util.find_library(lib_name)
+
+def find(lib_name: str, pkg_name: str|None = None) -> str|None:
     """Returns the path to the selected library, or None if not found.
 
     Arguments
@@ -93,61 +175,19 @@ def find(lib_name, pkg_name=None):
     """
     pkg_name = pkg_name or lib_name
     extension = EXTENSIONS.get(sys.platform, ".so")
-    libname = "lib{}{}".format(lib_name, extension)
+    lib_name = "lib{}{}".format(lib_name, extension)
 
-    # sys.prefix/lib, $CONDA_PREFIX/lib has highest priority;
-    # otherwise, system library may mess up anaconda's virtual environment.
+    sources = [
+        _find_in_package,
+        _find_in_python,
+        _find_in_home,
+        _find_in_config_paths,
+        _find_in_ld_path,
+        _find_in_sys,
+        _find_in_ctypes_util,
+    ]
 
-    roots = [sys.prefix]
-    if "CONDA_PREFIX" in os.environ:
-        roots.append(os.environ["CONDA_PREFIX"])
-
-    for root in roots:
-        for lib in ("lib", "lib64"):
-            fullname = os.path.join(root, lib, libname)
-            if os.path.exists(fullname):
-                return fullname
-
-    env_prefixes = [pkg_name.upper(), pkg_name.lower()]
-    env_suffixes = ["HOME", "DIR"]
-    envs = ["{}_{}".format(x, y) for x in env_prefixes for y in env_suffixes]
-
-    for env in envs:
-        if env in os.environ:
-            home = os.path.expanduser(os.environ[env])
-            for lib in ("lib", "lib64"):
-                fullname = os.path.join(home, lib, libname)
-                if os.path.exists(fullname):
-                    return fullname
-
-    config_paths = _get_paths_from_config()
-
-    for root in config_paths:
-        for lib in ("lib", "lib64"):
-            filepath = root / lib / f"lib{lib_name}{extension}"
-            if filepath.exists():
-                return str(filepath)
-
-    for path in (
-        "LD_LIBRARY_PATH",
-        "DYLD_LIBRARY_PATH",
-    ):
-        for home in os.environ.get(path, "").split(":"):
-            fullname = os.path.join(home, libname)
-            if os.path.exists(fullname):
-                return fullname
-
-    for root in (
-        "/",
-        "/usr/",
-        "/usr/local/",
-        "/opt/",
-        "/opt/homebrew/",
-        os.path.expanduser("~/.local"),
-    ):
-        for lib in ("lib", "lib64"):
-            fullname = os.path.join(root, lib, libname)
-            if os.path.exists(fullname):
-                return fullname
-
-    return ctypes.util.find_library(lib_name)
+    for source in sources:
+        if (result := source(lib_name, pkg_name)):
+            return result
+    return None
