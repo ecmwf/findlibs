@@ -13,27 +13,72 @@ import ctypes.util
 import importlib
 import os
 import sys
+import warnings
+from collections import defaultdict
 from pathlib import Path
+from types import ModuleType
 
 __version__ = "0.0.5"
 
-EXTENSIONS = {
-    "darwin": ".dylib",
-    "win32": ".dll",
-}
+EXTENSIONS = defaultdict(
+    lambda: ".so",
+    darwin=".dylib",
+    win32=".dll",
+)
+DYLIB_PATH = defaultdict(
+    lambda: "LD_LIBRARY_PATH",
+    darwin="DYLD_LIBRARY_PATH",
+    # win32? May be trickier
+)
 
 
-def _find_in_package(lib_name: str, pkg_name: str) -> str | None:
+def _extend_dylib_path_with(p: str) -> None:
+    """See _find_in_package"""
+    current = os.environ.get(DYLIB_PATH[sys.platform], "")
+    if not current:
+        extended = p
+    else:
+        extended = f"{p}:{current}"
+    os.environ[DYLIB_PATH[sys.platform]] = extended
+
+
+def _transitive_dylib_path_extension(module: ModuleType) -> None:
+    """See _find_in_package"""
+    # NOTE consider replacing hasattr with entrypoint-based declaration
+    # https://packaging.python.org/en/latest/specifications/entry-points/
+    if hasattr(module, "findlibs_dependencies"):
+        for module_name in module.findlibs_dependencies:
+            try:
+                rec_into = importlib.import_module(module_name)
+                ext_path = str(Path(rec_into.__file__).parent)
+                _extend_dylib_path_with(ext_path)
+                _transitive_dylib_path_extension(rec_into)
+            except ImportError:
+                # NOTE we don't use ImportWarning here as thats off by default
+                warnings.warn(
+                    f"unable to import {module_name} yet declared as dependency of {module.__name__}"
+                )
+
+
+def _find_in_package(
+    lib_name: str, pkg_name: str, trans_ext_dylib: bool = True
+) -> str | None:
     """Tries to find the library in an installed python module `{pgk_name}libs`.
     This is a convention used by, for example, by newly built binary-only ecmwf
-    packages, such as eckit dlibs in the "eckitlib" python module."""
+    packages, such as eckit dlibs in the "eckitlib" python module.
+
+    If trans_ext_dylib is True, it additionally extends platform linker's dylib path
+    (LD_LIBRARY_PATH / DYLD_LIBRARY_PATH) with dependencies declared in the module's
+    init. This is needed if the `.so`s in the wheel don't have correct rpath"""
     # NOTE we could have searched for relative location wrt __file__ -- but that
     # breaks eg editable installs of findlibs, conda-venv combinations, etc.
     # The price we pay is that the binary packages have to be importible, ie,
     # the default output of auditwheel wont work
     try:
         module = importlib.import_module(pkg_name + "libs")
-        venv_wheel_lib = str((Path(module.__file__) / ".." / lib_name).resolve())
+        if trans_ext_dylib:
+            _transitive_dylib_path_extension(module)
+        venv_wheel_lib = str((Path(module.__file__).parent / lib_name))
         if os.path.exists(venv_wheel_lib):
             return venv_wheel_lib
     except ImportError:
@@ -160,6 +205,10 @@ def _find_in_sys(lib_name: str, pkg_name: str) -> str | None:
 
 
 def _find_in_ctypes_util(lib_name: str, pkg_name: str) -> str | None:
+    # NOTE this is a bit unreliable function, as for some libraries/sources,
+    # it returns full path, in others just a filename. It still may be worth
+    # it as a fallback even in the filename-only case, to help troubleshoot some
+    # yet unknown source
     return ctypes.util.find_library(lib_name)
 
 
@@ -194,7 +243,7 @@ def find(lib_name: str, pkg_name: str | None = None) -> str | None:
         Path to selected library
     """
     pkg_name = pkg_name or lib_name
-    extension = EXTENSIONS.get(sys.platform, ".so")
+    extension = EXTENSIONS[sys.platform]
     lib_name = "lib{}{}".format(lib_name, extension)
 
     sources = (
