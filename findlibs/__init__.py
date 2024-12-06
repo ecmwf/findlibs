@@ -22,7 +22,8 @@ EXTENSIONS = {
     "win32": ".dll",
 }
 
-def _find_in_package(lib_name: str, pkg_name: str) -> str|None:
+
+def _find_in_package(lib_name: str, pkg_name: str) -> str | None:
     """Tries to find the library in an installed python module `{pgk_name}libs`.
     This is a convention used by, for example, by newly built binary-only ecmwf
     packages, such as eckit dlibs in the "eckitlib" python module."""
@@ -32,14 +33,15 @@ def _find_in_package(lib_name: str, pkg_name: str) -> str|None:
     # the default output of auditwheel wont work
     try:
         module = importlib.import_module(pkg_name + "libs")
-        venv_wheel_lib = str((Path(module.__file__) / '..' / lib_name).resolve())
+        venv_wheel_lib = str((Path(module.__file__) / ".." / lib_name).resolve())
         if os.path.exists(venv_wheel_lib):
             return venv_wheel_lib
     except ImportError:
         pass
     return None
 
-def _find_in_python(lib_name: str, pkg_name: str) -> str|None:
+
+def _find_in_python(lib_name: str, pkg_name: str) -> str | None:
     """Tries to find the library installed directly to Conda/Python sys.prefix
     libs"""
     roots = [sys.prefix]
@@ -53,7 +55,8 @@ def _find_in_python(lib_name: str, pkg_name: str) -> str|None:
                 return fullname
     return None
 
-def _find_in_home(lib_name: str, pkg_name: str) -> str|None:
+
+def _find_in_home(lib_name: str, pkg_name: str) -> str | None:
     env_prefixes = [pkg_name.upper(), pkg_name.lower()]
     env_suffixes = ["HOME", "DIR"]
     envs = ["{}_{}".format(x, y) for x in env_prefixes for y in env_suffixes]
@@ -66,6 +69,7 @@ def _find_in_home(lib_name: str, pkg_name: str) -> str|None:
                 if os.path.exists(fullname):
                     return fullname
     return None
+
 
 def _get_paths_from_config():
     locations = [
@@ -116,7 +120,8 @@ def _get_paths_from_config():
 
     return paths
 
-def _find_in_config_paths(lib_name: str, pkg_name: str) -> str|None:
+
+def _find_in_config_paths(lib_name: str, pkg_name: str) -> str | None:
     paths = _get_paths_from_config()
     for root in paths:
         for lib in ("lib", "lib64"):
@@ -125,7 +130,8 @@ def _find_in_config_paths(lib_name: str, pkg_name: str) -> str|None:
                 return str(filepath)
     return None
 
-def _find_in_ld_path(lib_name: str, pkg_name: str) -> str|None:
+
+def _find_in_ld_path(lib_name: str, pkg_name: str) -> str | None:
     for path in (
         "LD_LIBRARY_PATH",
         "DYLD_LIBRARY_PATH",
@@ -136,7 +142,8 @@ def _find_in_ld_path(lib_name: str, pkg_name: str) -> str|None:
                 return fullname
     return None
 
-def _find_in_sys(lib_name: str, pkg_name: str) -> str|None:
+
+def _find_in_sys(lib_name: str, pkg_name: str) -> str | None:
     for root in (
         "/",
         "/usr/",
@@ -151,11 +158,24 @@ def _find_in_sys(lib_name: str, pkg_name: str) -> str|None:
                 return fullname
     return None
 
-def _find_in_ctypes_util(lib_name: str, pkg_name: str) -> str|None:
+
+def _find_in_ctypes_util(lib_name: str, pkg_name: str) -> str | None:
     return ctypes.util.find_library(lib_name)
 
-def find(lib_name: str, pkg_name: str|None = None) -> str|None:
+
+def find(lib_name: str, pkg_name: str | None = None) -> str | None:
     """Returns the path to the selected library, or None if not found.
+    Searches over multiple sources in this order:
+      - importible python module ("PACKAGE")
+      - python's sys.prefix and conda's libs ("PYTHON")
+      - package's home like ECCODES_HOME ("HOME")
+      - findlibs config like .findlibs ("CONFIG_PATHS")
+      - ld library path ("LD_PATH")
+      - system's libraries ("SYS")
+      - invocation of ctypes.util ("CTYPES_UTIL")
+    each can be disabled via setting FINDLIBS_DISABLE_{method} to "yes",
+    so eg `export FINDLIBS_DISABLE_PACKAGE=yes`. Consult the code for each
+    individual method implementation and further configurability.
 
     Arguments
     ---------
@@ -177,17 +197,22 @@ def find(lib_name: str, pkg_name: str|None = None) -> str|None:
     extension = EXTENSIONS.get(sys.platform, ".so")
     lib_name = "lib{}{}".format(lib_name, extension)
 
-    sources = [
-        _find_in_package,
-        _find_in_python,
-        _find_in_home,
-        _find_in_config_paths,
-        _find_in_ld_path,
-        _find_in_sys,
-        _find_in_ctypes_util,
-    ]
+    sources = (
+        (_find_in_package, "PACKAGE"),
+        (_find_in_python, "PYTHON"),
+        (_find_in_home, "HOME"),
+        (_find_in_config_paths, "CONFIG_PATHS"),
+        (_find_in_ld_path, "LD_PATH"),
+        (_find_in_sys, "SYS"),
+        (_find_in_ctypes_util, "CTYPES_UTIL"),
+    )
+    sources_filtered = (
+        source_clb
+        for source_clb, source_name in sources
+        if os.environ.get(f"FINDLIBS_DISABLE_{source_name}", None) != "yes"
+    )
 
-    for source in sources:
-        if (result := source(lib_name, pkg_name)):
+    for source in sources_filtered:
+        if result := source(lib_name, pkg_name):
             return result
     return None
