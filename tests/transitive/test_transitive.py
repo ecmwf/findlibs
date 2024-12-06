@@ -1,11 +1,10 @@
-import os
 import sys
 from pathlib import Path
 
-from findlibs import DYLIB_PATH, find
+import findlibs
 
 
-def test_transitive() -> None:
+def test_transitive(monkeypatch) -> None:
     """There is a module modAlibs in this directory that mocks expected bin wheel contract:
      - modulename ends with 'libs'
      - contains libmodA.so
@@ -14,11 +13,21 @@ def test_transitive() -> None:
     env var with the full path to the modBlibs module
     """
 
+    # so that modAlibs and modBlibs are visible
     sys.path.append(str(Path(__file__).parent))
 
-    found = find("modA")
+    # the files in test are not real .so, we thus just track what got loaded
+    loaded_libs = set()
+
+    def libload_accumulator(path: str):
+        loaded_libs.add(path)
+
+    monkeypatch.setattr(findlibs, "CDLL", libload_accumulator)
+
+    # test
+    found = findlibs.find("modA")
     expected_found = str(Path(__file__).parent / "modAlibs" / "libmodA.so")
     assert found == expected_found
 
-    expected_dylib = str(Path(__file__).parent / "modBlibs")
-    assert expected_dylib in os.environ[DYLIB_PATH[sys.platform]]
+    expected_dylib = str(Path(__file__).parent / "modBlibs" / "libmodB.so")
+    assert loaded_libs == {expected_dylib}

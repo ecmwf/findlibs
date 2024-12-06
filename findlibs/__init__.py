@@ -15,6 +15,7 @@ import os
 import sys
 import warnings
 from collections import defaultdict
+from ctypes import CDLL
 from pathlib import Path
 from types import ModuleType
 
@@ -25,24 +26,16 @@ EXTENSIONS = defaultdict(
     darwin=".dylib",
     win32=".dll",
 )
-DYLIB_PATH = defaultdict(
-    lambda: "LD_LIBRARY_PATH",
-    darwin="DYLD_LIBRARY_PATH",
-    # win32? May be trickier
-)
 
 
-def _extend_dylib_path_with(p: str) -> None:
+def _single_preload_deps(path: str) -> None:
     """See _find_in_package"""
-    current = os.environ.get(DYLIB_PATH[sys.platform], "")
-    if not current:
-        extended = p
-    else:
-        extended = f"{p}:{current}"
-    os.environ[DYLIB_PATH[sys.platform]] = extended
+    for lib in os.listdir(path):
+        if lib.endswith(".so"):
+            _ = CDLL(f"{path}/{lib}")
 
 
-def _transitive_dylib_path_extension(module: ModuleType) -> None:
+def _transitive_preload_deps(module: ModuleType) -> None:
     """See _find_in_package"""
     # NOTE consider replacing hasattr with entrypoint-based declaration
     # https://packaging.python.org/en/latest/specifications/entry-points/
@@ -51,8 +44,10 @@ def _transitive_dylib_path_extension(module: ModuleType) -> None:
             try:
                 rec_into = importlib.import_module(module_name)
                 ext_path = str(Path(rec_into.__file__).parent)
-                _extend_dylib_path_with(ext_path)
-                _transitive_dylib_path_extension(rec_into)
+                # NOTE we need *first* to evaluate recursive call, *then* preload,
+                # to ensure that dependencies are already in place
+                _transitive_preload_deps(rec_into)
+                _single_preload_deps(ext_path)
             except ImportError:
                 # NOTE we don't use ImportWarning here as thats off by default
                 warnings.warn(
@@ -61,23 +56,22 @@ def _transitive_dylib_path_extension(module: ModuleType) -> None:
 
 
 def _find_in_package(
-    lib_name: str, pkg_name: str, trans_ext_dylib: bool = True
+    lib_name: str, pkg_name: str, preload_deps: bool = True
 ) -> str | None:
     """Tries to find the library in an installed python module `{pgk_name}libs`.
     This is a convention used by, for example, by newly built binary-only ecmwf
     packages, such as eckit dlibs in the "eckitlib" python module.
 
-    If trans_ext_dylib is True, it additionally extends platform linker's dylib path
-    (LD_LIBRARY_PATH / DYLD_LIBRARY_PATH) with dependencies declared in the module's
-    init. This is needed if the `.so`s in the wheel don't have correct rpath"""
-    # NOTE we could have searched for relative location wrt __file__ -- but that
-    # breaks eg editable installs of findlibs, conda-venv combinations, etc.
-    # The price we pay is that the binary packages have to be importible, ie,
-    # the default output of auditwheel wont work
+    If preload deps is True, it additionally opens all dylibs of this library and its
+    transitive dependencies This is needed if the `.so`s in the wheel don't have
+    correct rpath -- which is effectively impossible in non-trivial venvs.
+
+    It would be tempting to just extend LD_LIBRARY_PATH -- alas, that won't have any
+    effect as the linker has been configured already by the time cpython is running"""
     try:
         module = importlib.import_module(pkg_name + "libs")
-        if trans_ext_dylib:
-            _transitive_dylib_path_extension(module)
+        if preload_deps:
+            _transitive_preload_deps(module)
         venv_wheel_lib = str((Path(module.__file__).parent / lib_name))
         if os.path.exists(venv_wheel_lib):
             return venv_wheel_lib
