@@ -26,8 +26,8 @@ def test_transitive(monkeypatch) -> None:
 
     # test
     found = findlibs.find("modA")
-    expected_found = str(Path(__file__).parent / "modAlibs" / "libmodA.so")
+    expected_found = str(Path(__file__).parent / "modAlibs" / "lib64" / "libmodA.so")
     assert found == expected_found
 
-    expected_dylib = str(Path(__file__).parent / "modBlibs" / "libmodB.so")
+    expected_dylib = str(Path(__file__).parent / "modBlibs" / "lib64" / "libmodB.so")
     assert loaded_libs == {expected_dylib}

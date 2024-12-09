@@ -30,6 +30,8 @@ EXTENSIONS = defaultdict(
     win32=".dll",
 )
 
+binary_module_name = lambda s: f"{s}libs"  # noqa: E731
+
 
 def _single_preload_deps(path: str) -> None:
     """See _find_in_package"""
@@ -45,11 +47,12 @@ def _transitive_preload_deps(module: ModuleType) -> None:
     if hasattr(module, "findlibs_dependencies"):
         for module_name in module.findlibs_dependencies:
             try:
-                rec_into = importlib.import_module(module_name)
-                ext_path = str(Path(rec_into.__file__).parent)
+                rec_into = importlib.import_module(binary_module_name(module_name))
                 # NOTE we need *first* to evaluate recursive call, *then* preload,
                 # to ensure that dependencies are already in place
                 _transitive_preload_deps(rec_into)
+
+                ext_path = str(Path(rec_into.__file__).parent / "lib64")
                 _single_preload_deps(ext_path)
             except ImportError:
                 # NOTE we don't use ImportWarning here as thats off by default
@@ -72,10 +75,10 @@ def _find_in_package(
     It would be tempting to just extend LD_LIBRARY_PATH -- alas, that won't have any
     effect as the linker has been configured already by the time cpython is running"""
     try:
-        module = importlib.import_module(pkg_name + "libs")
+        module = importlib.import_module(binary_module_name(pkg_name))
         if preload_deps:
             _transitive_preload_deps(module)
-        venv_wheel_lib = str((Path(module.__file__).parent / lib_name))
+        venv_wheel_lib = str((Path(module.__file__).parent / "lib64" / lib_name))
         if os.path.exists(venv_wheel_lib):
             return venv_wheel_lib
     except ImportError:

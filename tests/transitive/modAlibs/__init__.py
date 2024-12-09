@@ -1,1 +1,1 @@
-findlibs_dependencies = ["modBlibs"]
+findlibs_dependencies = ["modB"]
