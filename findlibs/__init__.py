@@ -11,6 +11,7 @@
 import configparser
 import ctypes.util
 import importlib
+import logging
 import os
 import sys
 import warnings
@@ -20,6 +21,8 @@ from pathlib import Path
 from types import ModuleType
 
 __version__ = "0.0.5"
+
+logger = logging.getLogger(__name__)
 
 EXTENSIONS = defaultdict(
     lambda: ".so",
@@ -256,6 +259,8 @@ def find(lib_name: str, pkg_name: str | None = None) -> str | None:
     )
 
     for source in sources_filtered:
+        logger.debug(f"about to search for {lib_name}/{pkg_name} in {source}")
         if result := source(lib_name, pkg_name):
+            logger.debug(f"found {lib_name}/{pkg_name} in {source}")
             return result
     return None
