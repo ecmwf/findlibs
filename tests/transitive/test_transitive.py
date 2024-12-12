@@ -23,6 +23,7 @@ def test_transitive(monkeypatch) -> None:
         loaded_libs.add(path)
 
     monkeypatch.setattr(findlibs, "CDLL", libload_accumulator)
+    findlibs.EXTENSIONS[sys.platform] = ".so"
 
     # test
     found = findlibs.find("modA")

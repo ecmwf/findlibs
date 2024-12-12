@@ -36,7 +36,7 @@ binary_module_name = lambda s: f"{s}libs"  # noqa: E731
 def _single_preload_deps(path: str) -> None:
     """See _find_in_package"""
     for lib in os.listdir(path):
-        if lib.endswith(".so"):
+        if lib.endswith(EXTENSIONS[sys.platform]):
             _ = CDLL(f"{path}/{lib}")
 
 
@@ -52,8 +52,12 @@ def _transitive_preload_deps(module: ModuleType) -> None:
                 # to ensure that dependencies are already in place
                 _transitive_preload_deps(rec_into)
 
-                ext_path = str(Path(rec_into.__file__).parent / "lib64")
-                _single_preload_deps(ext_path)
+                for ext_path in (
+                    str(Path(rec_into.__file__).parent / "lib"),
+                    str(Path(rec_into.__file__).parent / "lib64"),
+                ):
+                    if os.path.exists(ext_path):
+                        _single_preload_deps(ext_path)
             except ImportError:
                 # NOTE we don't use ImportWarning here as thats off by default
                 warnings.warn(
@@ -78,9 +82,12 @@ def _find_in_package(
         module = importlib.import_module(binary_module_name(pkg_name))
         if preload_deps:
             _transitive_preload_deps(module)
-        venv_wheel_lib = str((Path(module.__file__).parent / "lib64" / lib_name))
-        if os.path.exists(venv_wheel_lib):
-            return venv_wheel_lib
+        for venv_wheel_lib in (
+            str((Path(module.__file__).parent / "lib" / lib_name)),
+            str((Path(module.__file__).parent / "lib64" / lib_name)),
+        ):
+            if os.path.exists(venv_wheel_lib):
+                return venv_wheel_lib
     except ImportError:
         pass
     return None
