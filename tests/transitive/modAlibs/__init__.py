@@ -1,1 +1,0 @@
-findlibs_dependencies = ["modB"]

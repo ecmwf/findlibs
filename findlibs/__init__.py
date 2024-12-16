@@ -30,8 +30,6 @@ EXTENSIONS = defaultdict(
     win32=".dll",
 )
 
-binary_module_name = lambda s: f"{s}libs"  # noqa: E731
-
 
 def _single_preload_deps(path: str) -> None:
     """See _find_in_package"""
@@ -47,7 +45,7 @@ def _transitive_preload_deps(module: ModuleType) -> None:
     if hasattr(module, "findlibs_dependencies"):
         for module_name in module.findlibs_dependencies:
             try:
-                rec_into = importlib.import_module(binary_module_name(module_name))
+                rec_into = importlib.import_module(module_name)
                 # NOTE we need *first* to evaluate recursive call, *then* preload,
                 # to ensure that dependencies are already in place
                 _transitive_preload_deps(rec_into)
@@ -68,9 +66,8 @@ def _transitive_preload_deps(module: ModuleType) -> None:
 def _find_in_package(
     lib_name: str, pkg_name: str, preload_deps: bool = True
 ) -> str | None:
-    """Tries to find the library in an installed python module `{pgk_name}libs`.
-    This is a convention used by, for example, by newly built binary-only ecmwf
-    packages, such as eckit dlibs in the "eckitlib" python module.
+    """Tries to find the library in an installed python module `{pgk_name}`.
+    Examples of packages with such expositions are `eckitlib` or `odclib`.
 
     If preload deps is True, it additionally opens all dylibs of this library and its
     transitive dependencies This is needed if the `.so`s in the wheel don't have
@@ -79,7 +76,7 @@ def _find_in_package(
     It would be tempting to just extend LD_LIBRARY_PATH -- alas, that won't have any
     effect as the linker has been configured already by the time cpython is running"""
     try:
-        module = importlib.import_module(binary_module_name(pkg_name))
+        module = importlib.import_module(pkg_name)
         if preload_deps:
             _transitive_preload_deps(module)
         for venv_wheel_lib in (
@@ -110,6 +107,9 @@ def _find_in_python(lib_name: str, pkg_name: str) -> str | None:
 
 def _find_in_home(lib_name: str, pkg_name: str) -> str | None:
     env_prefixes = [pkg_name.upper(), pkg_name.lower()]
+    if pkg_name.endswith("lib"):
+        # if eg "eckitlib" is pkg name, consider also "eckit" prefix
+        env_prefixes += [pkg_name.upper()[:-3], pkg_name.lower()[:-3]]
     env_suffixes = ["HOME", "DIR"]
     envs = ["{}_{}".format(x, y) for x in env_prefixes for y in env_suffixes]
 
@@ -242,14 +242,16 @@ def find(lib_name: str, pkg_name: str | None = None) -> str | None:
         name will be "libeccodes.so" on Linux and "libeccodes.dylib"
         on macOS.
     pkg_name :  str, optional
-        Package name if it differs from the library name. Defaults to None.
+        Package name if it differs from the library name. Defaults to None,
+        which sets it to f"{lib_name}lib". Used by python module import and
+        home sources, with the home source considering also `lib`-less name.
 
     Returns
     --------
     str or None
         Path to selected library
     """
-    pkg_name = pkg_name or lib_name
+    pkg_name = pkg_name or f"{lib_name}lib"
     extension = EXTENSIONS[sys.platform]
     lib_name = "lib{}{}".format(lib_name, extension)
 

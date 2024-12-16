@@ -6,11 +6,10 @@ import findlibs
 
 def test_transitive(monkeypatch) -> None:
     """There is a module modAlibs in this directory that mocks expected bin wheel contract:
-     - modulename ends with 'libs'
+     - modulename ends with 'lib'
      - contains libmodA.so
-     - inside __init__ there is the findlibs_dependencies, containing modBlibs
-    This test checks that when such module is findlibs-found, it extend the platform's dylib
-    env var with the full path to the modBlibs module
+     - inside __init__ there is the findlibs_dependencies, containing modBlib
+    This test checks that when such module is findlibs-found, the (mock) ld loaded the libmodB
     """
 
     # so that modAlibs and modBlibs are visible
@@ -27,8 +26,8 @@ def test_transitive(monkeypatch) -> None:
 
     # test
     found = findlibs.find("modA")
-    expected_found = str(Path(__file__).parent / "modAlibs" / "lib64" / "libmodA.so")
+    expected_found = str(Path(__file__).parent / "modAlib" / "lib64" / "libmodA.so")
     assert found == expected_found
 
-    expected_dylib = str(Path(__file__).parent / "modBlibs" / "lib64" / "libmodB.so")
+    expected_dylib = str(Path(__file__).parent / "modBlib" / "lib64" / "libmodB.so")
     assert loaded_libs == {expected_dylib}
