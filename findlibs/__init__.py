@@ -13,6 +13,7 @@ import ctypes.util
 import importlib
 import logging
 import os
+import re
 import sys
 import warnings
 from collections import defaultdict
@@ -29,13 +30,21 @@ EXTENSIONS = defaultdict(
     darwin=".dylib",
     win32=".dll",
 )
+EXTENSIONS_RE = defaultdict(
+    lambda: r"^.*\.so(.[0-9]+)?$",
+    darwin=r"^.*\.dylib$",
+    win32=r"^.*\.dll$",
+)
 
 
 def _single_preload_deps(path: str) -> None:
     """See _find_in_package"""
     for lib in os.listdir(path):
-        if lib.endswith(EXTENSIONS[sys.platform]):
+        print(f"considering {lib}")
+        if re.match(EXTENSIONS_RE[sys.platform], lib):
+            print(f"loading {lib}")
             _ = CDLL(f"{path}/{lib}")
+            print(f"loaded {lib}")
 
 
 def _transitive_preload_deps(module: ModuleType) -> None:
