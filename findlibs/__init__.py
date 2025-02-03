@@ -39,12 +39,13 @@ EXTENSIONS_RE = defaultdict(
 
 def _single_preload_deps(path: str) -> None:
     """See _find_in_package"""
+    logger.debug(f"initiating recursive search at {path}")
     for lib in os.listdir(path):
-        print(f"considering {lib}")
+        logger.debug(f"considering {lib}")
         if re.match(EXTENSIONS_RE[sys.platform], lib):
-            print(f"loading {lib}")
+            logger.debug(f"loading {lib} at {path}")
             _ = CDLL(f"{path}/{lib}")
-            print(f"loaded {lib}")
+            logger.debug(f"loaded {lib}")
 
 
 def _transitive_preload_deps(module: ModuleType) -> None:
@@ -53,6 +54,7 @@ def _transitive_preload_deps(module: ModuleType) -> None:
     # https://packaging.python.org/en/latest/specifications/entry-points/
     if hasattr(module, "findlibs_dependencies"):
         for module_name in module.findlibs_dependencies:
+            logger.debug(f"consider transitive dependency preload of {module_name}")
             try:
                 rec_into = importlib.import_module(module_name)
                 # NOTE we need *first* to evaluate recursive call, *then* preload,
@@ -67,9 +69,9 @@ def _transitive_preload_deps(module: ModuleType) -> None:
                         _single_preload_deps(ext_path)
             except ImportError:
                 # NOTE we don't use ImportWarning here as thats off by default
-                warnings.warn(
-                    f"unable to import {module_name} yet declared as dependency of {module.__name__}"
-                )
+                m = f"unable to import {module_name} yet declared as dependency of {module.__name__}"
+                warnings.warn(m)
+                logger.debug(m)
 
 
 def _find_in_package(
@@ -86,6 +88,7 @@ def _find_in_package(
     effect as the linker has been configured already by the time cpython is running"""
     try:
         module = importlib.import_module(pkg_name)
+        logger.debug(f"found package {pkg_name}")
         if preload_deps:
             _transitive_preload_deps(module)
         for venv_wheel_lib in (
