@@ -10,16 +10,133 @@
 
 import configparser
 import ctypes.util
+import importlib
+import logging
 import os
+import re
 import sys
+import warnings
+from collections import defaultdict
+from ctypes import CDLL
 from pathlib import Path
+from types import ModuleType
 
 __version__ = "0.0.5"
 
-EXTENSIONS = {
-    "darwin": ".dylib",
-    "win32": ".dll",
-}
+logger = logging.getLogger(__name__)
+
+EXTENSIONS = defaultdict(
+    lambda: ".so",
+    darwin=".dylib",
+    win32=".dll",
+)
+EXTENSIONS_RE = defaultdict(
+    lambda: r"^.*\.so(.[0-9]+)?$",
+    darwin=r"^.*\.dylib$",
+    win32=r"^.*\.dll$",
+)
+
+
+def _single_preload_deps(path: str) -> None:
+    """See _find_in_package"""
+    logger.debug(f"initiating recursive search at {path}")
+    for lib in os.listdir(path):
+        logger.debug(f"considering {lib}")
+        if re.match(EXTENSIONS_RE[sys.platform], lib):
+            logger.debug(f"loading {lib} at {path}")
+            _ = CDLL(f"{path}/{lib}")
+            logger.debug(f"loaded {lib}")
+
+
+def _transitive_preload_deps(module: ModuleType) -> None:
+    """See _find_in_package"""
+    # NOTE consider replacing hasattr with entrypoint-based declaration
+    # https://packaging.python.org/en/latest/specifications/entry-points/
+    if hasattr(module, "findlibs_dependencies"):
+        for module_name in module.findlibs_dependencies:
+            logger.debug(f"consider transitive dependency preload of {module_name}")
+            try:
+                rec_into = importlib.import_module(module_name)
+                # NOTE we need *first* to evaluate recursive call, *then* preload,
+                # to ensure that dependencies are already in place
+                _transitive_preload_deps(rec_into)
+
+                for ext_path in (
+                    str(Path(rec_into.__file__).parent / "lib"),
+                    str(Path(rec_into.__file__).parent / "lib64"),
+                ):
+                    if os.path.exists(ext_path):
+                        _single_preload_deps(ext_path)
+            except ImportError:
+                # NOTE we don't use ImportWarning here as thats off by default
+                m = f"unable to import {module_name} yet declared as dependency of {module.__name__}"
+                warnings.warn(m)
+                logger.debug(m)
+
+
+def _find_in_package(
+    lib_name: str, pkg_name: str, preload_deps: bool | None = None
+) -> str | None:
+    """Tries to find the library in an installed python module `{pgk_name}`.
+    Examples of packages with such expositions are `eckitlib` or `odclib`.
+
+    If preload deps is True, it additionally opens all dylibs of this library and its
+    transitive dependencies This is needed if the `.so`s in the wheel don't have
+    correct rpath -- which is effectively impossible in non-trivial venvs.
+
+    It would be tempting to just extend LD_LIBRARY_PATH -- alas, that won't have any
+    effect as the linker has been configured already by the time cpython is running"""
+    if preload_deps is None:
+        preload_deps = (
+            sys.platform != "darwin"
+        )  # NOTE dyld doesnt seem to coop with ctypes.CDLL of weak-deps
+    try:
+        module = importlib.import_module(pkg_name)
+        logger.debug(f"found package {pkg_name}; with {preload_deps=}")
+        if preload_deps:
+            _transitive_preload_deps(module)
+        for venv_wheel_lib in (
+            str((Path(module.__file__).parent / "lib" / lib_name)),
+            str((Path(module.__file__).parent / "lib64" / lib_name)),
+        ):
+            if os.path.exists(venv_wheel_lib):
+                return venv_wheel_lib
+    except ImportError:
+        pass
+    return None
+
+
+def _find_in_python(lib_name: str, pkg_name: str) -> str | None:
+    """Tries to find the library installed directly to Conda/Python sys.prefix
+    libs"""
+    roots = [sys.prefix]
+    if "CONDA_PREFIX" in os.environ:
+        roots.append(os.environ["CONDA_PREFIX"])
+
+    for root in roots:
+        for lib in ("lib", "lib64"):
+            fullname = os.path.join(root, lib, lib_name)
+            if os.path.exists(fullname):
+                return fullname
+    return None
+
+
+def _find_in_home(lib_name: str, pkg_name: str) -> str | None:
+    env_prefixes = [pkg_name.upper(), pkg_name.lower()]
+    if pkg_name.endswith("lib"):
+        # if eg "eckitlib" is pkg name, consider also "eckit" prefix
+        env_prefixes += [pkg_name.upper()[:-3], pkg_name.lower()[:-3]]
+    env_suffixes = ["HOME", "DIR"]
+    envs = ["{}_{}".format(x, y) for x in env_prefixes for y in env_suffixes]
+
+    for env in envs:
+        if env in os.environ:
+            home = os.path.expanduser(os.environ[env])
+            for lib in ("lib", "lib64"):
+                fullname = os.path.join(home, lib, lib_name)
+                if os.path.exists(fullname):
+                    return fullname
+    return None
 
 
 def _get_paths_from_config():
@@ -72,8 +189,65 @@ def _get_paths_from_config():
     return paths
 
 
-def find(lib_name, pkg_name=None):
+def _find_in_config_paths(lib_name: str, pkg_name: str) -> str | None:
+    paths = _get_paths_from_config()
+    for root in paths:
+        for lib in ("lib", "lib64"):
+            filepath = root / lib / lib_name
+            if filepath.exists():
+                return str(filepath)
+    return None
+
+
+def _find_in_ld_path(lib_name: str, pkg_name: str) -> str | None:
+    for path in (
+        "LD_LIBRARY_PATH",
+        "DYLD_LIBRARY_PATH",
+    ):
+        for home in os.environ.get(path, "").split(":"):
+            fullname = os.path.join(home, lib_name)
+            if os.path.exists(fullname):
+                return fullname
+    return None
+
+
+def _find_in_sys(lib_name: str, pkg_name: str) -> str | None:
+    for root in (
+        "/",
+        "/usr/",
+        "/usr/local/",
+        "/opt/",
+        "/opt/homebrew/",
+        os.path.expanduser("~/.local"),
+    ):
+        for lib in ("lib", "lib64"):
+            fullname = os.path.join(root, lib, lib_name)
+            if os.path.exists(fullname):
+                return fullname
+    return None
+
+
+def _find_in_ctypes_util(lib_name: str, pkg_name: str) -> str | None:
+    # NOTE this is a bit unreliable function, as for some libraries/sources,
+    # it returns full path, in others just a filename. It still may be worth
+    # it as a fallback even in the filename-only case, to help troubleshoot some
+    # yet unknown source
+    return ctypes.util.find_library(lib_name)
+
+
+def find(lib_name: str, pkg_name: str | None = None) -> str | None:
     """Returns the path to the selected library, or None if not found.
+    Searches over multiple sources in this order:
+      - importible python module ("PACKAGE")
+      - python's sys.prefix and conda's libs ("PYTHON")
+      - package's home like ECCODES_HOME ("HOME")
+      - findlibs config like .findlibs ("CONFIG_PATHS")
+      - ld library path ("LD_PATH")
+      - system's libraries ("SYS")
+      - invocation of ctypes.util ("CTYPES_UTIL")
+    each can be disabled via setting FINDLIBS_DISABLE_{method} to "yes",
+    so eg `export FINDLIBS_DISABLE_PACKAGE=yes`. Consult the code for each
+    individual method implementation and further configurability.
 
     Arguments
     ---------
@@ -84,70 +258,37 @@ def find(lib_name, pkg_name=None):
         name will be "libeccodes.so" on Linux and "libeccodes.dylib"
         on macOS.
     pkg_name :  str, optional
-        Package name if it differs from the library name. Defaults to None.
+        Package name if it differs from the library name. Defaults to None,
+        which sets it to f"{lib_name}lib". Used by python module import and
+        home sources, with the home source considering also `lib`-less name.
 
     Returns
     --------
     str or None
         Path to selected library
     """
-    pkg_name = pkg_name or lib_name
-    extension = EXTENSIONS.get(sys.platform, ".so")
-    libname = "lib{}{}".format(lib_name, extension)
+    pkg_name = pkg_name or f"{lib_name}lib"
+    extension = EXTENSIONS[sys.platform]
+    lib_name = "lib{}{}".format(lib_name, extension)
 
-    # sys.prefix/lib, $CONDA_PREFIX/lib has highest priority;
-    # otherwise, system library may mess up anaconda's virtual environment.
+    sources = (
+        (_find_in_package, "PACKAGE"),
+        (_find_in_python, "PYTHON"),
+        (_find_in_home, "HOME"),
+        (_find_in_config_paths, "CONFIG_PATHS"),
+        (_find_in_ld_path, "LD_PATH"),
+        (_find_in_sys, "SYS"),
+        (_find_in_ctypes_util, "CTYPES_UTIL"),
+    )
+    sources_filtered = (
+        source_clb
+        for source_clb, source_name in sources
+        if os.environ.get(f"FINDLIBS_DISABLE_{source_name}", None) != "yes"
+    )
 
-    roots = [sys.prefix]
-    if "CONDA_PREFIX" in os.environ:
-        roots.append(os.environ["CONDA_PREFIX"])
-
-    for root in roots:
-        for lib in ("lib", "lib64"):
-            fullname = os.path.join(root, lib, libname)
-            if os.path.exists(fullname):
-                return fullname
-
-    env_prefixes = [pkg_name.upper(), pkg_name.lower()]
-    env_suffixes = ["HOME", "DIR"]
-    envs = ["{}_{}".format(x, y) for x in env_prefixes for y in env_suffixes]
-
-    for env in envs:
-        if env in os.environ:
-            home = os.path.expanduser(os.environ[env])
-            for lib in ("lib", "lib64"):
-                fullname = os.path.join(home, lib, libname)
-                if os.path.exists(fullname):
-                    return fullname
-
-    config_paths = _get_paths_from_config()
-
-    for root in config_paths:
-        for lib in ("lib", "lib64"):
-            filepath = root / lib / f"lib{lib_name}{extension}"
-            if filepath.exists():
-                return str(filepath)
-
-    for path in (
-        "LD_LIBRARY_PATH",
-        "DYLD_LIBRARY_PATH",
-    ):
-        for home in os.environ.get(path, "").split(":"):
-            fullname = os.path.join(home, libname)
-            if os.path.exists(fullname):
-                return fullname
-
-    for root in (
-        "/",
-        "/usr/",
-        "/usr/local/",
-        "/opt/",
-        "/opt/homebrew/",
-        os.path.expanduser("~/.local"),
-    ):
-        for lib in ("lib", "lib64"):
-            fullname = os.path.join(root, lib, libname)
-            if os.path.exists(fullname):
-                return fullname
-
-    return ctypes.util.find_library(lib_name)
+    for source in sources_filtered:
+        logger.debug(f"about to search for {lib_name}/{pkg_name} in {source}")
+        if result := source(lib_name, pkg_name):
+            logger.debug(f"found {lib_name}/{pkg_name} in {source}")
+            return result
+    return None
