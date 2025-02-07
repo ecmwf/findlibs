@@ -21,7 +21,7 @@ from ctypes import CDLL
 from pathlib import Path
 from types import ModuleType
 
-__version__ = "0.0.5"
+__version__ = "0.1.0"
 
 logger = logging.getLogger(__name__)
 
