@@ -75,7 +75,7 @@ def _transitive_preload_deps(module: ModuleType) -> None:
 
 
 def _find_in_package(
-    lib_name: str, pkg_name: str, preload_deps: bool|None = None
+    lib_name: str, pkg_name: str, preload_deps: bool | None = None
 ) -> str | None:
     """Tries to find the library in an installed python module `{pgk_name}`.
     Examples of packages with such expositions are `eckitlib` or `odclib`.
@@ -87,7 +87,9 @@ def _find_in_package(
     It would be tempting to just extend LD_LIBRARY_PATH -- alas, that won't have any
     effect as the linker has been configured already by the time cpython is running"""
     if preload_deps is None:
-        preload_deps = sys.platform != "darwin" # NOTE dyld doesnt seem to coop with ctypes.CDLL of weak-deps
+        preload_deps = (
+            sys.platform != "darwin"
+        )  # NOTE dyld doesnt seem to coop with ctypes.CDLL of weak-deps
     try:
         module = importlib.import_module(pkg_name)
         logger.debug(f"found package {pkg_name}; with {preload_deps=}")
