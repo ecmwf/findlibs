@@ -232,7 +232,8 @@ def _find_in_ctypes_util(lib_name: str, pkg_name: str) -> str | None:
     # it returns full path, in others just a filename. It still may be worth
     # it as a fallback even in the filename-only case, to help troubleshoot some
     # yet unknown source
-    return ctypes.util.find_library(lib_name)
+    return (ctypes.util.find_library(lib_name) or
+            ctypes.util.find_library(lib_name.removeprefix('lib')))
 
 
 def find(lib_name: str, pkg_name: str | None = None) -> str | None:
