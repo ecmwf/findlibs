@@ -17,7 +17,7 @@ import re
 import sys
 import warnings
 from collections import defaultdict
-from ctypes import CDLL
+from ctypes import CDLL, RTLD_GLOBAL
 from pathlib import Path
 from types import ModuleType
 
@@ -37,6 +37,14 @@ EXTENSIONS_RE = defaultdict(
 )
 
 
+def _load_globally(path: str) -> CDLL:
+    """Loads the library to make it accessible to subsequently loaded libraries and extensions"""
+    # NOTE this doesnt ultimately work on MacOS -- without corresponding `rpath`s on the lib, we end up
+    # failing asserts in `eckit::system::LibraryRegistry::enregister`. Possibly, fixing that assert,
+    # making library names correct, etc, could make this work
+    return CDLL(path, mode=RTLD_GLOBAL)
+
+
 def _single_preload_deps(path: str) -> None:
     """See _find_in_package"""
     logger.debug(f"initiating recursive search at {path}")
@@ -44,7 +52,7 @@ def _single_preload_deps(path: str) -> None:
         logger.debug(f"considering {lib}")
         if re.match(EXTENSIONS_RE[sys.platform], lib):
             logger.debug(f"loading {lib} at {path}")
-            _ = CDLL(f"{path}/{lib}")
+            _ = _load_globally(f"{path}/{lib}")
             logger.debug(f"loaded {lib}")
 
 
@@ -89,7 +97,7 @@ def _find_in_package(
     if preload_deps is None:
         preload_deps = (
             sys.platform != "darwin"
-        )  # NOTE dyld doesnt seem to coop with ctypes.CDLL of weak-deps
+        )  # NOTE see _load_globally for explanation
     try:
         module = importlib.import_module(pkg_name)
         logger.debug(f"found package {pkg_name}; with {preload_deps=}")
@@ -292,3 +300,12 @@ def find(lib_name: str, pkg_name: str | None = None) -> str | None:
             logger.debug(f"found {lib_name}/{pkg_name} in {source}")
             return result
     return None
+
+
+def load(lib_name: str, pkg_name: str | None = None) -> CDLL:
+    """Convenience method to find a library and load it right away (recursively)"""
+    path = find(lib_name, pkg_name)
+    if not path:
+        raise ValueError(f"unable to find {pkg_name+'.' if pkg_name else ''}{lib_name}")
+    else:
+        return _load_globally(path)
