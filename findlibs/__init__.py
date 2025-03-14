@@ -36,12 +36,14 @@ EXTENSIONS_RE = defaultdict(
     win32=r"^.*\.dll$",
 )
 
+
 def _load_globally(path: str) -> CDLL:
     """Loads the library to make it accessible to subsequently loaded libraries and extensions"""
     # NOTE this doesnt ultimately work on MacOS -- without corresponding `rpath`s on the lib, we end up
     # failing asserts in `eckit::system::LibraryRegistry::enregister`. Possibly, fixing that assert,
     # making library names correct, etc, could make this work
     return CDLL(path, mode=RTLD_GLOBAL)
+
 
 def _single_preload_deps(path: str) -> None:
     """See _find_in_package"""
@@ -298,6 +300,7 @@ def find(lib_name: str, pkg_name: str | None = None) -> str | None:
             logger.debug(f"found {lib_name}/{pkg_name} in {source}")
             return result
     return None
+
 
 def load(lib_name: str, pkg_name: str | None = None) -> CDLL:
     """Convenience method to find a library and load it right away (recursively)"""

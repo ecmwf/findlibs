@@ -1,6 +1,6 @@
 import sys
-from pathlib import Path
 import typing
+from pathlib import Path
 
 import findlibs
 
