@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import typing
 
 import findlibs
 
@@ -18,7 +19,7 @@ def test_transitive(monkeypatch) -> None:
     # the files in test are not real .so, we thus just track what got loaded
     loaded_libs = set()
 
-    def libload_accumulator(path: str):
+    def libload_accumulator(path: str, mode: typing.Any):
         loaded_libs.add(path)
 
     monkeypatch.setattr(findlibs, "CDLL", libload_accumulator)
