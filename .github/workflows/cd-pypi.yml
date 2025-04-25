@@ -7,7 +7,7 @@ on:
 
 jobs:
   pypi:
-    uses: ecmwf-actions/reusable-workflows/.github/workflows/cd-pypi.yml@feat/build_multiple_wheels
+    uses: ecmwf/reusable-workflows/.github/workflows/cd-pypi.yml@feat/build_multiple_wheels
     with:
       testpypi: true
     secrets: inherit
