@@ -21,7 +21,7 @@ from ctypes import CDLL, RTLD_GLOBAL
 from pathlib import Path
 from types import ModuleType
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 logger = logging.getLogger(__name__)
 
