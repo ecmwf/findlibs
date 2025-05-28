@@ -1,0 +1,52 @@
+# (C) Copyright 2020 ECMWF.
+#
+# This software is licensed under the terms of the Apache Licence Version 2.0
+# which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+# In applying this licence, ECMWF does not waive the privileges and immunities
+# granted to it by virtue of its status as an intergovernmental organisation
+# nor does it submit to any jurisdiction.
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "findlibs"
+dynamic = [ "version" ]
+description = "A package to search for shared libraries on various platforms"
+readme = "README.md"
+license = { text = "Apache License Version 2.0" }
+authors = [
+  { name = "European Centre for Medium-Range Weather Forecasts (ECMWF)", email = "software@ecmwf.int" }
+]
+keywords = ["tool"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.6",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+  "Operating System :: OS Independent"
+]
+dependencies = []
+
+[project.urls]
+homepage = "https://github.com/ecmwf/findlibs"
+
+[tool.setuptools.packages.find]
+include = ["findlibs"]
+
+[tool.setuptools.dynamic]
+version = {attr = "findlibs.__version__"}
+
+[project.optional-dependencies]
+test = ["pytest", "pyfakefs"]
