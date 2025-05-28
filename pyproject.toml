@@ -13,7 +13,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "findlibs"
 dynamic = [ "version" ]
-description = "A packages to search for shared libraries on various platforms"
+description = "A package to search for shared libraries on various platforms"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [
