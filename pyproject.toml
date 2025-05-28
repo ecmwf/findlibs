@@ -15,7 +15,7 @@ name = "findlibs"
 dynamic = [ "version" ]
 description = "A package to search for shared libraries on various platforms"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = { text = "Apache License Version 2.0" }
 authors = [
   { name = "European Centre for Medium-Range Weather Forecasts (ECMWF)", email = "software@ecmwf.int" }
 ]
