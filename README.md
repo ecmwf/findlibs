@@ -50,11 +50,15 @@ Returns the path to the selected library, or None if not found.
 
 The **algorithm** to find the library is as follows:
 
-- First, tries the `lib` and `lib64` directories under `sys.prefix` and `$CONDA_PREFIX`
+- First, tries to find the library in an installed python module package
+  with the given name, e.g. eccodeslib, eckitlib. Disable this search
+  option by setting environment variable `FINDLIBS_DISABLE_PACKAGE=yes`.
 
-- Next, tries the `lib` and `lib64` directories under the paths defined by the `pkg_name + "_HOME"` and `pkg_name + "_DIR"` environment variables. Both lowercase and uppercase versions are tested. E.g. if `pkg_name` is "eccodes" it will check the paths defined by `$eccodes_dir`, `$eccodes_home`, `$ECCODES_DIR` and `$ECCODES_HOME`.
+- Next, tries the `lib` and `lib64` directories under `sys.prefix` and `$CONDA_PREFIX`. Disable this search option by setting environment variable `FINDLIBS_DISABLE_PYTHON=yes`.
 
-- Next, tries to load the search paths from the user defined `~/.findlibs` or `~/.config/findlibs/findlibs.conf` INI configuration files. Then for all the user defined search paths the `lib` and `lib64` directories are tried. 
+- Next, tries the `lib` and `lib64` directories under the paths defined by the `pkg_name + "_HOME"` and `pkg_name + "_DIR"` environment variables. Both lowercase and uppercase versions are tested. E.g. if `pkg_name` is "eccodes" it will check the paths defined by `$eccodes_dir`, `$eccodes_home`, `$ECCODES_DIR` and `$ECCODES_HOME`. Disable this search option by setting environment variable `FINDLIBS_DISABLE_HOME=yes`.
+
+- Next, tries to load the search paths from the user defined `~/.findlibs` or `~/.config/findlibs/findlibs.conf` INI configuration files. Then for all the user defined search paths, the `lib` and `lib64` subdirectories are tried. 
 
     Please note that only one of these files can exist. The configuration file can contain multiple search paths, but no relative paths or paths to files are allowed. The file can even be completely empty or can contain no paths at all. The file format is as follows:
 
@@ -62,7 +66,10 @@ The **algorithm** to find the library is as follows:
     [Paths]
     /path/to/lib_directory
     ```
+  Disable this search option by setting environment variable `FINDLIBS_DISABLE_CONFIG_PATHS=yes`.
 
-- Next, tries the directories defined by the `$LD_LIBRARY_PATH` and `$DYLD_LIBRARY_PATH` environment variables
+- Next, tries the directories defined by the `$LD_LIBRARY_PATH` and `$DYLD_LIBRARY_PATH` environment variables. Disable this search option by setting environment variable `FINDLIBS_DISABLE_LD_PATH=yes`.
 
-- Finally, tries the `lib` and `lib64` directories under the following paths "/", "/usr/", "/usr/local/", "/opt/", "/opt/homebrew/" and "~/.local/"
+- Next, tries the `lib` and `lib64` directories under the following paths "/", "/usr/", "/usr/local/", "/opt/", "/opt/homebrew/" and "~/.local/". Disable this search option by setting environment variable `FINDLIBS_DISABLE_SYS=yes`.
+
+- Finally, tries calling the `ctypes.util.find_library` function. Disable this search option by setting environment variable `FINDLIBS_DISABLE_CTYPES_UTIL=yes`.
