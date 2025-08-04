@@ -22,7 +22,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Union
 
-__version__ = "0.1.2"
+__version__ = "0.1.1"
 
 logger = logging.getLogger(__name__)
 
@@ -281,6 +281,64 @@ def find(lib_name: str, pkg_name: Union[str, None] = None) -> Union[str, None]:
     pkg_name = pkg_name or f"{lib_name}lib"
     extension = EXTENSIONS[sys.platform]
     lib_name = "lib{}{}".format(lib_name, extension)
+
+    sources = (
+        (_find_in_package, "PACKAGE"),
+        (_find_in_python, "PYTHON"),
+        (_find_in_home, "HOME"),
+        (_find_in_config_paths, "CONFIG_PATHS"),
+        (_find_in_ld_path, "LD_PATH"),
+        (_find_in_sys, "SYS"),
+        (_find_in_ctypes_util, "CTYPES_UTIL"),
+    )
+    sources_filtered = (
+        source_clb
+        for source_clb, source_name in sources
+        if os.environ.get(f"FINDLIBS_DISABLE_{source_name}", None) != "yes"
+    )
+
+    for source in sources_filtered:
+        logger.debug(f"about to search for {lib_name}/{pkg_name} in {source}")
+        if result := source(lib_name, pkg_name):
+            logger.debug(f"found {lib_name}/{pkg_name} in {source}")
+            return result
+    return None
+
+def find_module(lib_name: str) -> Union[str, None]:
+    """Returns the path to the selected library, or None if not found.
+    Searches over multiple sources in this order:
+      - importible python module ("PACKAGE")
+      - python's sys.prefix and conda's libs ("PYTHON")
+      - package's home like ECCODES_HOME ("HOME")
+      - findlibs config like .findlibs ("CONFIG_PATHS")
+      - ld library path ("LD_PATH")
+      - system's libraries ("SYS")
+      - invocation of ctypes.util ("CTYPES_UTIL")
+    each can be disabled via setting FINDLIBS_DISABLE_{method} to "yes",
+    so eg `export FINDLIBS_DISABLE_PACKAGE=yes`. Consult the code for each
+    individual method implementation and further configurability.
+
+    Arguments
+    ---------
+    lib_name : str
+        Library name without the `lib` prefix. The name of the library to
+        find is formed using ``lib_name`` and a platform specific suffix
+        (by default ".so"). E.g. when ``lib_name`` is "eccodes" the library
+        name will be "libeccodes.so" on Linux and "libeccodes.dylib"
+        on macOS.
+    pkg_name :  str, optional
+        Package name if it differs from the library name. Defaults to None,
+        which sets it to f"{lib_name}lib". Used by python module import and
+        home sources, with the home source considering also `lib`-less name.
+
+    Returns
+    --------
+    str or None
+        Path to selected library
+    """
+    extension = EXTENSIONS[sys.platform]
+    lib_name = "{}{}".format(lib_name, extension)
+    pkg_name = f"{lib_name}"
 
     sources = (
         (_find_in_package, "PACKAGE"),
