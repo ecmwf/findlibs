@@ -294,7 +294,7 @@ def find(lib_name: str, pkg_name: Union[str, None] = None) -> Union[str, None]:
     sources_filtered = (
         source_clb
         for source_clb, source_name in sources
-        if os.environ.get(f"FINDLIBS_DISABLE_{source_name}", None) != "yes"
+        if os.environ.get(f"FINDLIBS_DISABLE_{source_name}", None) not in ("yes", "1")
     )
 
     for source in sources_filtered:
