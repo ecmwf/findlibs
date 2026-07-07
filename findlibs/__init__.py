@@ -304,7 +304,9 @@ def find(lib_name: str, pkg_name: Union[str, None] = None) -> Union[str, None]:
     return None
 
 
-def load(lib_name: str, pkg_name: Union[str, None] = None, load_all: bool = True) -> CDLL:
+def load(
+    lib_name: str, pkg_name: Union[str, None] = None, load_all: bool = True
+) -> CDLL:
     """Convenience method to find a library and load it right away (recursively). When `load_all=True`,
     all libraries of the given package are loaded (for example, not just libeckit.so, but also libeckit_maths.so).
     Only the main library is returned in any case.
