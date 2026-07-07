@@ -13,6 +13,7 @@ import ctypes.util
 import importlib
 import logging
 import os
+import pathlib
 import re
 import sys
 import warnings
@@ -38,22 +39,20 @@ EXTENSIONS_RE = defaultdict(
 )
 
 
-def _load_globally(path: str) -> CDLL:
-    """Loads the library to make it accessible to subsequently loaded libraries and extensions"""
+def _load_single_globally(lib_path: str) -> CDLL:
+    """Loads the .so/.dylib at the path to make it accessible to subsequently loaded libraries and extensions"""
     # NOTE this doesnt ultimately work on MacOS -- without corresponding `rpath`s on the lib, we end up
     # failing asserts in `eckit::system::LibraryRegistry::enregister`. Possibly, fixing that assert,
     # making library names correct, etc, could make this work
-    return CDLL(path, mode=RTLD_GLOBAL)
+    return CDLL(lib_path, mode=RTLD_GLOBAL)
 
 
-def _single_preload_deps(path: str) -> None:
-    """See _find_in_package"""
-    logger.debug(f"initiating recursive search at {path}")
-    for lib in os.listdir(path):
-        logger.debug(f"considering {lib}")
+def _load_all_globally(dir_path: str) -> None:
+    """Loads every .so/.dylib directly in the given location"""
+    logger.debug(f"loading deps at {dir_path}")
+    for lib in os.listdir(dir_path):
         if re.match(EXTENSIONS_RE[sys.platform], lib):
-            logger.debug(f"loading {lib} at {path}")
-            _ = _load_globally(f"{path}/{lib}")
+            _ = _load_single_globally(f"{dir_path}/{lib}")
             logger.debug(f"loaded {lib}")
 
 
@@ -75,7 +74,7 @@ def _transitive_preload_deps(module: ModuleType) -> None:
                     str(Path(rec_into.__file__).parent / "lib64"),
                 ):
                     if os.path.exists(ext_path):
-                        _single_preload_deps(ext_path)
+                        _load_all_globally(ext_path)
             except ImportError:
                 # NOTE we don't use ImportWarning here as thats off by default
                 m = f"unable to import {module_name} yet declared as dependency of {module.__name__}"
@@ -98,7 +97,7 @@ def _find_in_package(
     if preload_deps is None:
         preload_deps = (
             sys.platform != "darwin"
-        )  # NOTE see _load_globally for explanation
+        )  # NOTE see _load_all_globally for explanation
     try:
         module = importlib.import_module(pkg_name)
         logger.debug(f"found package {pkg_name}; with {preload_deps=}")
@@ -305,10 +304,15 @@ def find(lib_name: str, pkg_name: Union[str, None] = None) -> Union[str, None]:
     return None
 
 
-def load(lib_name: str, pkg_name: Union[str, None] = None) -> CDLL:
-    """Convenience method to find a library and load it right away (recursively)"""
+def load(lib_name: str, pkg_name: Union[str, None] = None, load_all: bool = True) -> CDLL:
+    """Convenience method to find a library and load it right away (recursively). When `load_all=True`,
+    all libraries of the given package are loaded (for example, not just libeckit.so, but also libeckit_maths.so).
+    Only the main library is returned in any case.
+    """
     path = find(lib_name, pkg_name)
     if not path:
         raise ValueError(f"unable to find {pkg_name+'.' if pkg_name else ''}{lib_name}")
     else:
-        return _load_globally(path)
+        if load_all:
+            _load_all_globally(str(pathlib.Path(path).parent))
+    return _load_single_globally(path)
