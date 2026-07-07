@@ -25,3 +25,5 @@ __pycache__/
 *.code-workspace
 
 *swp
+
+dist
