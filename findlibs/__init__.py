@@ -40,7 +40,8 @@ EXTENSIONS_RE = defaultdict(
 
 
 def _load_single_globally(lib_path: str) -> CDLL:
-    """Loads the .so/.dylib at the path to make it accessible to subsequently loaded libraries and extensions"""
+    """Loads the .so/.dylib at the path to make it accessible to subsequently loaded libraries
+    and extensions"""
     # NOTE this doesnt ultimately work on MacOS -- without corresponding `rpath`s on the lib, we end up
     # failing asserts in `eckit::system::LibraryRegistry::enregister`. Possibly, fixing that assert,
     # making library names correct, etc, could make this work
@@ -308,8 +309,8 @@ def load(
     lib_name: str, pkg_name: Union[str, None] = None, load_all: bool = True
 ) -> CDLL:
     """Convenience method to find a library and load it right away (recursively). When `load_all=True`,
-    all libraries of the given package are loaded (for example, not just libeckit.so, but also libeckit_maths.so).
-    Only the main library is returned in any case.
+    all libraries of the given package are loaded (for example, not just libeckit.so, but also
+    libeckit_maths.so). Only the main library is returned in any case.
     """
     path = find(lib_name, pkg_name)
     if not path:
