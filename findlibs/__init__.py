@@ -311,11 +311,27 @@ def load(
     """Convenience method to find a library and load it right away (recursively). When `load_all=True`,
     all libraries of the given package are loaded (for example, not just libeckit.so, but also
     libeckit_maths.so). Only the main library is returned in any case.
+
+    Note that in the case of the library not being found in the python package (a wheel), this
+    behaves somehow differently:
+     - prerequisites are *not* preloaded automatically,
+     - load_all is *ignored*,
+    in other words, the rpaths/ld_library_path must be self-contained and complete.
     """
     path = find(lib_name, pkg_name)
     if not path:
         raise ValueError(f"unable to find {pkg_name+'.' if pkg_name else ''}{lib_name}")
     else:
         if load_all:
-            _load_all_globally(str(pathlib.Path(path).parent))
+            # NOTE we dont want to invoke global load when the lib was found at eg /usr/lib
+            # or in home etc, as that could have loaded *much more*. Checking for 'site-packages'
+            # is a hacky fragile way of "this is likely a venv" which should be safe-enough for
+            # loading. A possibly better solution is to filter by some lib_name/pkg_name submatches,
+            # or explicitly declare which of the _find_in methods would support this
+            if "site-packages" in path:
+                _load_all_globally(str(pathlib.Path(path).parent))
+            else:
+                logger.warning(
+                    f"load_all=True ignored due to {path=} not coming from a venv"
+                )
     return _load_single_globally(path)
