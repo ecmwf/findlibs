@@ -27,3 +27,6 @@ __pycache__/
 *swp
 
 dist
+
+# this project is not officialy uv-based
+uv.lock 
