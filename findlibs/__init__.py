@@ -309,6 +309,8 @@ def load(lib_name: str, pkg_name: Union[str, None] = None) -> CDLL:
     """Convenience method to find a library and load it right away (recursively)"""
     path = find(lib_name, pkg_name)
     if not path:
-        raise ValueError(f"unable to find {pkg_name+'.' if pkg_name else ''}{lib_name}")
+        raise ModuleNotFoundError(
+            f"unable to find {pkg_name+'.' if pkg_name else ''}{lib_name}"
+        )
     else:
         return _load_globally(path)
