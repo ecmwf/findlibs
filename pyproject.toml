@@ -40,10 +40,15 @@ dependencies = []
 homepage = "https://github.com/ecmwf/findlibs"
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["findlibs"]
 
 [tool.setuptools.dynamic]
 version = {attr = "findlibs.__version__"}
+
+[tool.coverage.run]
+source = ["findlibs"]
+
 
 [project.optional-dependencies]
 test = ["pytest", "pyfakefs"]
