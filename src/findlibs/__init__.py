@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # (C) Copyright 2020 ECMWF.
 #
 # This software is licensed under the terms of the Apache Licence Version 2.0
@@ -20,7 +19,6 @@ from collections import defaultdict
 from ctypes import CDLL, RTLD_GLOBAL
 from pathlib import Path
 from types import ModuleType
-from typing import Union
 
 __version__ = "0.1.3"
 
@@ -84,8 +82,8 @@ def _transitive_preload_deps(module: ModuleType) -> None:
 
 
 def _find_in_package(
-    lib_name: str, pkg_name: str, preload_deps: Union[bool, None] = None
-) -> Union[str, None]:
+    lib_name: str, pkg_name: str, preload_deps: bool | None = None
+) -> str | None:
     """Tries to find the library in an installed python module `{pgk_name}`.
     Examples of packages with such expositions are `eckitlib` or `odclib`.
 
@@ -105,8 +103,8 @@ def _find_in_package(
         if preload_deps:
             _transitive_preload_deps(module)
         for venv_wheel_lib in (
-            str((Path(module.__file__).parent / "lib" / lib_name)),
-            str((Path(module.__file__).parent / "lib64" / lib_name)),
+            str(Path(module.__file__).parent / "lib" / lib_name),
+            str(Path(module.__file__).parent / "lib64" / lib_name),
         ):
             if os.path.exists(venv_wheel_lib):
                 return venv_wheel_lib
@@ -115,7 +113,7 @@ def _find_in_package(
     return None
 
 
-def _find_in_python(lib_name: str, pkg_name: str) -> Union[str, None]:
+def _find_in_python(lib_name: str, pkg_name: str) -> str | None:
     """Tries to find the library installed directly to Conda/Python sys.prefix
     libs"""
     roots = [sys.prefix]
@@ -130,13 +128,13 @@ def _find_in_python(lib_name: str, pkg_name: str) -> Union[str, None]:
     return None
 
 
-def _find_in_home(lib_name: str, pkg_name: str) -> Union[str, None]:
+def _find_in_home(lib_name: str, pkg_name: str) -> str | None:
     env_prefixes = [pkg_name.upper(), pkg_name.lower()]
     if pkg_name.endswith("lib"):
         # if eg "eckitlib" is pkg name, consider also "eckit" prefix
         env_prefixes += [pkg_name.upper()[:-3], pkg_name.lower()[:-3]]
     env_suffixes = ["HOME", "DIR"]
-    envs = ["{}_{}".format(x, y) for x in env_prefixes for y in env_suffixes]
+    envs = [f"{x}_{y}" for x in env_prefixes for y in env_suffixes]
 
     for env in envs:
         if env in os.environ:
@@ -183,10 +181,8 @@ def _get_paths_from_config():
     relative_paths = [p for p in paths if not p.is_absolute()]
     if relative_paths:
         raise ValueError(
-            (
-                f"Don't use relative paths in the config file ({locations[0]}),"
-                f" offending paths are: {relative_paths}"
-            )
+            f"Don't use relative paths in the config file ({locations[0]}),"
+            f" offending paths are: {relative_paths}"
         )
 
     files = [p for p in paths if not p.is_dir()]
@@ -198,7 +194,7 @@ def _get_paths_from_config():
     return paths
 
 
-def _find_in_config_paths(lib_name: str, pkg_name: str) -> Union[str, None]:
+def _find_in_config_paths(lib_name: str, pkg_name: str) -> str | None:
     paths = _get_paths_from_config()
     for root in paths:
         for lib in ("lib", "lib64"):
@@ -208,7 +204,7 @@ def _find_in_config_paths(lib_name: str, pkg_name: str) -> Union[str, None]:
     return None
 
 
-def _find_in_ld_path(lib_name: str, pkg_name: str) -> Union[str, None]:
+def _find_in_ld_path(lib_name: str, pkg_name: str) -> str | None:
     for path in (
         "LD_LIBRARY_PATH",
         "DYLD_LIBRARY_PATH",
@@ -220,7 +216,7 @@ def _find_in_ld_path(lib_name: str, pkg_name: str) -> Union[str, None]:
     return None
 
 
-def _find_in_sys(lib_name: str, pkg_name: str) -> Union[str, None]:
+def _find_in_sys(lib_name: str, pkg_name: str) -> str | None:
     for root in (
         "/",
         "/usr/",
@@ -236,7 +232,7 @@ def _find_in_sys(lib_name: str, pkg_name: str) -> Union[str, None]:
     return None
 
 
-def _find_in_ctypes_util(lib_name: str, pkg_name: str) -> Union[str, None]:
+def _find_in_ctypes_util(lib_name: str, pkg_name: str) -> str | None:
     # NOTE this is a bit unreliable function, as for some libraries/sources,
     # it returns full path, in others just a filename. It still may be worth
     # it as a fallback even in the filename-only case, to help troubleshoot some
@@ -246,7 +242,7 @@ def _find_in_ctypes_util(lib_name: str, pkg_name: str) -> Union[str, None]:
     )
 
 
-def find(lib_name: str, pkg_name: Union[str, None] = None) -> Union[str, None]:
+def find(lib_name: str, pkg_name: str | None = None) -> str | None:
     """Returns the path to the selected library, or None if not found.
     Searches over multiple sources in this order:
       - importible python module ("PACKAGE")
@@ -280,7 +276,7 @@ def find(lib_name: str, pkg_name: Union[str, None] = None) -> Union[str, None]:
     """
     pkg_name = pkg_name or f"{lib_name}lib"
     extension = EXTENSIONS[sys.platform]
-    lib_name = "lib{}{}".format(lib_name, extension)
+    lib_name = f"lib{lib_name}{extension}"
 
     sources = (
         (_find_in_package, "PACKAGE"),
@@ -305,7 +301,7 @@ def find(lib_name: str, pkg_name: Union[str, None] = None) -> Union[str, None]:
     return None
 
 
-def load(lib_name: str, pkg_name: Union[str, None] = None) -> CDLL:
+def load(lib_name: str, pkg_name: str | None = None) -> CDLL:
     """Convenience method to find a library and load it right away (recursively)"""
     path = find(lib_name, pkg_name)
     if not path:
