@@ -9,6 +9,7 @@
 #
 
 import configparser
+import ctypes
 import ctypes.util
 import importlib
 import logging
@@ -17,7 +18,6 @@ import re
 import sys
 import warnings
 from collections import defaultdict
-from ctypes import CDLL, RTLD_GLOBAL
 from pathlib import Path
 from types import ModuleType
 from typing import Union
@@ -38,12 +38,14 @@ EXTENSIONS_RE = defaultdict(
 )
 
 
-def _load_globally(path: str) -> CDLL:
+def _load_globally(path: str) -> ctypes.CDLL:
     """Loads the library to make it accessible to subsequently loaded libraries and extensions"""
     # NOTE this doesnt ultimately work on MacOS -- without corresponding `rpath`s on the lib, we end up
     # failing asserts in `eckit::system::LibraryRegistry::enregister`. Possibly, fixing that assert,
     # making library names correct, etc, could make this work
-    return CDLL(path, mode=RTLD_GLOBAL)
+    # NOTE RTLD_GLOBAL causes trouble eg when we have simultaneously eckit and pyproj, as the eckit's
+    # load causes segfaults during pyproj usage, as the symbols clash
+    return ctypes.CDLL(path, mode=ctypes.RTLD_LOCAL)
 
 
 def _single_preload_deps(path: str) -> None:
@@ -305,7 +307,7 @@ def find(lib_name: str, pkg_name: Union[str, None] = None) -> Union[str, None]:
     return None
 
 
-def load(lib_name: str, pkg_name: Union[str, None] = None) -> CDLL:
+def load(lib_name: str, pkg_name: Union[str, None] = None) -> ctypes.CDLL:
     """Convenience method to find a library and load it right away (recursively)"""
     path = find(lib_name, pkg_name)
     if not path:
