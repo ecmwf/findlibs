@@ -22,7 +22,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Union
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 logger = logging.getLogger(__name__)
 
