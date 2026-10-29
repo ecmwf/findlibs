@@ -22,7 +22,7 @@ def test_transitive(monkeypatch) -> None:
     def libload_accumulator(path: str, mode: typing.Any):
         loaded_libs.add(path)
 
-    monkeypatch.setattr(findlibs, "CDLL", libload_accumulator)
+    monkeypatch.setattr(findlibs.ctypes, "CDLL", libload_accumulator)
     monkeypatch.setattr(
         sys, "platform", "tests"
     )  # this makes the test behave like linux default
