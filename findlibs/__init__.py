@@ -36,14 +36,18 @@ EXTENSIONS_RE = defaultdict(
 )
 
 
-def _load_globally(path: str) -> ctypes.CDLL:
+def _load(path: str, is_global: bool) -> ctypes.CDLL:
     """Loads the library to make it accessible to subsequently loaded libraries and extensions"""
     # NOTE this doesnt ultimately work on MacOS -- without corresponding `rpath`s on the lib, we end up
     # failing asserts in `eckit::system::LibraryRegistry::enregister`. Possibly, fixing that assert,
     # making library names correct, etc, could make this work
-    # NOTE RTLD_GLOBAL causes trouble eg when we have simultaneously eckit and pyproj, as the eckit's
-    # load causes segfaults during pyproj usage, as the symbols clash
-    return ctypes.CDLL(path, mode=ctypes.RTLD_LOCAL)
+    # NOTE RTLD_GLOBAL causes trouble eg when we have simultaneously eckit and pyproj, as that causes
+    # libproj to be loaded twice, globally, leading to symbol clash and segfault
+    # NOTE RTLD_LOCAL causes trouble on libeckit itself because of some weakrefs things
+    if is_global:
+        return ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
+    else:
+        return ctypes.CDLL(path, mode=ctypes.RTLD_LOCAL)
 
 
 def _single_preload_deps(path: str) -> None:
@@ -53,7 +57,7 @@ def _single_preload_deps(path: str) -> None:
         logger.debug(f"considering {lib}")
         if re.match(EXTENSIONS_RE[sys.platform], lib):
             logger.debug(f"loading {lib} at {path}")
-            _ = _load_globally(f"{path}/{lib}")
+            _ = _load(path=f"{path}/{lib}", is_global=False)
             logger.debug(f"loaded {lib}")
 
 
@@ -311,4 +315,4 @@ def load(lib_name: str, pkg_name: str | None = None) -> ctypes.CDLL:
             f"unable to find {pkg_name+'.' if pkg_name else ''}{lib_name}"
         )
     else:
-        return _load_globally(path)
+        return _load(path=path, is_global=True)
