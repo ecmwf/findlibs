@@ -42,8 +42,8 @@ def _load(path: str, is_global: bool) -> ctypes.CDLL:
     # failing asserts in `eckit::system::LibraryRegistry::enregister`. Possibly, fixing that assert,
     # making library names correct, etc, could make this work
     # NOTE RTLD_GLOBAL causes trouble eg when we have simultaneously eckit and pyproj, as that causes
-    # libproj to be loaded twice, globally, leading to symbol clash and segfault
-    # NOTE RTLD_LOCAL causes trouble on libeckit itself because of some weakrefs things
+    # libproj to be loaded twice, globally, leading to symbol clash and segfault (on linux)
+    # NOTE RTLD_LOCAL causes trouble on libeckit itself on macos because of some weakrefs things
     if is_global:
         return ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
     else:
@@ -315,4 +315,5 @@ def load(lib_name: str, pkg_name: str | None = None) -> ctypes.CDLL:
             f"unable to find {pkg_name+'.' if pkg_name else ''}{lib_name}"
         )
     else:
-        return _load(path=path, is_global=True)
+        # NOTE see the _load for why True on darwin
+        return _load(path=path, is_global=sys.platfrom == "darwin")
