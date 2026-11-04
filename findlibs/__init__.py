@@ -316,4 +316,4 @@ def load(lib_name: str, pkg_name: str | None = None) -> ctypes.CDLL:
         )
     else:
         # NOTE see the _load for why True on darwin
-        return _load(path=path, is_global=sys.platfrom == "darwin")
+        return _load(path=path, is_global=sys.platform == "darwin")
