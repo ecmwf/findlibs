@@ -1,0 +1,4 @@
+{% extends "ci-infrastructure/python-runner.sh.j2" %}
+{% block set_environment %}
+export FINDLIBS_DISABLE_PACKAGE=no
+{% endblock %}
