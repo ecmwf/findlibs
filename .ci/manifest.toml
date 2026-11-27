@@ -26,3 +26,11 @@ python-version = "3.12"
 
 [[matrix.test.include]]
 python-version = "3.13"
+
+[[trigger-downstream]]
+repo = "ecmwf/eccodes-python"
+ref = "develop"
+
+[[trigger-downstream]]
+repo = "ecmwf/pyodc"
+ref = "develop"
